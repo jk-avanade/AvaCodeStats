@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/AvaCodeStats.Core/AvaCodeStats.Core.csproj" />
+    <Project Path="src/AvaCodeStats/AvaCodeStats.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/AvaCodeStats.Core.Tests/AvaCodeStats.Core.Tests.csproj" />
+  </Folder>
+</Solution>
