@@ -21,6 +21,15 @@ public partial class App : Application
         }
         base.OnStartup(e);
 
+        // A tray app should survive a bad redraw: log it and carry on instead of disappearing.
+        DispatcherUnhandledException += (_, args) =>
+        {
+            CrashLog.Write(args.Exception);
+            args.Handled = true;
+        };
+        AppDomain.CurrentDomain.UnhandledException += (_, args) => CrashLog.Write(args.ExceptionObject as Exception);
+        TaskScheduler.UnobservedTaskException += (_, args) => { CrashLog.Write(args.Exception); args.SetObserved(); };
+
         _host = new AppHost();
         _host.Start();
 
@@ -35,5 +44,22 @@ public partial class App : Application
         _host?.Dispose();
         _mutex?.Dispose();
         base.OnExit(e);
+    }
+}
+
+/// <summary>Appends unhandled errors to %LOCALAPPDATA%\AvaCodeStats\errors.log.</summary>
+internal static class CrashLog
+{
+    public static string Path => System.IO.Path.Combine(Core.AppSettings.DataDirectory, "errors.log");
+
+    public static void Write(Exception? e)
+    {
+        if (e is null) return;
+        try
+        {
+            System.IO.Directory.CreateDirectory(Core.AppSettings.DataDirectory);
+            System.IO.File.AppendAllText(Path, $"[{DateTimeOffset.Now:O}] {e}{Environment.NewLine}{Environment.NewLine}");
+        }
+        catch (System.IO.IOException) { }
     }
 }

@@ -135,8 +135,8 @@ public partial class AnalyticsPage : UserControl, IPage
     {
         var p = ThemeService.Current;
         ChartTitle.Text = (bucket < TimeSpan.FromDays(1) ? "Hourly " : "Daily ") + (IsCost ? "cost" : "processed tokens");
+        Chart.Reset();
         var plot = Chart.Plot;
-        plot.Clear();
         ChartStyle.Apply(plot);
         var xs = rep.Buckets.Select(b => b.StartUtc.LocalDateTime).ToArray();
         foreach (var provider in rep.ByProvider.Select(g => g.Key).Reverse())

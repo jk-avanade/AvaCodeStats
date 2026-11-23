@@ -125,11 +125,10 @@ public partial class BurnPage : UserControl, IPage
             new Kpi("Resets in", Fmt.Countdown(snap.PeriodEndUtc - now), $"{end:ddd d MMM HH:mm}", text),
         };
 
+        // A fresh plot each time: the tabs use different axis types (dates vs. periods), and a
+        // date axis cannot be switched back to numeric ticks in place.
+        Chart.Reset();
         var plot = Chart.Plot;
-        plot.Clear();
-        plot.Legend.ManualItems.Clear();
-        plot.Axes.Left.Label.Text = "";
-        plot.Axes.Bottom.TickGenerator = new SP.TickGenerators.NumericAutomatic();
         ChartStyle.Apply(plot);
         if (TabDaily.IsChecked == true) DrawDaily(plot, snap, samples, pace);
         else if (TabHistory.IsChecked == true) DrawHistory(plot, snap);
