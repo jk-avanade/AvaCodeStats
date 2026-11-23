@@ -1,22 +1,32 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UseWPF>true</UseWPF>
+    <!-- Only for the tray NotifyIcon; WPF has no tray icon of its own. -->
+    <UseWindowsForms>true</UseWindowsForms>
+    <AssemblyName>AvaCodeStats</AssemblyName>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <!-- NU1701: ScottPlot pulls .NET Framework-only OpenTK/Skia view packages it does not use here.
+         WPF0001: the WPF Fluent theme (ThemeMode) is marked experimental. -->
+    <NoWarn>$(NoWarn);NU1701;WPF0001</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Keep WPF types unambiguous; tray code names WinForms / System.Drawing types explicitly. -->
+    <Using Remove="System.Windows.Forms" />
+    <Using Remove="System.Drawing" />
+  </ItemGroup>
+
   <ItemGroup>
     <ProjectReference Include="..\AvaCodeStats.Core\AvaCodeStats.Core.csproj" />
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="ScottPlot.WinForms" Version="5.1.59" />
+    <PackageReference Include="ScottPlot.WPF" Version="5.1.59" />
   </ItemGroup>
-
-  <PropertyGroup>
-    <OutputType>WinExe</OutputType>
-    <TargetFramework>net10.0-windows</TargetFramework>
-    <Nullable>enable</Nullable>
-    <UseWindowsForms>true</UseWindowsForms>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <NoWarn>$(NoWarn);NU1701</NoWarn>
-    <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
-    <AssemblyName>AvaCodeStats</AssemblyName>
-  </PropertyGroup>
 
 </Project>

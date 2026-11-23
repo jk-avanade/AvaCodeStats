@@ -1,3 +1,4 @@
+using System.Net.Http.Headers;
 using System.Text.Json;
 using AvaCodeStats.Core.Providers.Claude;
 using AvaCodeStats.Core.Tokens;
@@ -5,10 +6,12 @@ using AvaCodeStats.Core.Tokens;
 namespace AvaCodeStats.Core.Providers.Codex;
 
 /// <summary>
-/// Codex (ChatGPT plan) usage, all from Codex's own session logs (sessions/ and archived_sessions/):
-/// token_count events carry per-call tokens and the latest rate-limit windows.
+/// Codex (ChatGPT plan) usage:
+/// - limits live from Codex's own usage endpoint, with the ChatGPT sign-in Codex keeps in auth.json
+///   (read-only), falling back to the rate-limit windows recorded in its session logs;
+/// - tokens from token_count events in the session logs (sessions/ and archived_sessions/).
 /// </summary>
-public sealed class CodexProvider(string account, string codexHome, TokenStore tokens) : IUsageProvider
+public sealed class CodexProvider(string account, string codexHome, TokenStore tokens, HttpClient? http = null, bool live = true) : IUsageProvider
 {
     public const string Id = "codex";
 
@@ -22,13 +25,76 @@ public sealed class CodexProvider(string account, string codexHome, TokenStore t
         Environment.GetEnvironmentVariable("CODEX_HOME")
         ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".codex");
 
+    private static readonly Uri UsageEndpoint = new("https://chatgpt.com/backend-api/wham/usage");
+
     public async Task<IReadOnlyList<UsageSnapshot>> FetchAsync(CancellationToken ct)
     {
         await Task.Run(ScanLogs, ct);
+        if (live && http is not null && await TryLiveAsync(ct) is { Count: > 0 } current) return current;
         return tokens.GetValue(LimitsKey) is { } json
             ? ParseLimits(json, account, DateTimeOffset.UtcNow)
             : [];
     }
+
+    private async Task<IReadOnlyList<UsageSnapshot>?> TryLiveAsync(CancellationToken ct)
+    {
+        try
+        {
+            var path = Path.Combine(codexHome, "auth.json");
+            if (!File.Exists(path)) return null;
+            string? token, accountId;
+            using (var doc = JsonDocument.Parse(await File.ReadAllTextAsync(path, ct)))
+            {
+                if (!doc.RootElement.TryGetProperty("tokens", out var t) || t.ValueKind != JsonValueKind.Object) return null;
+                token = ClaudeCodeProvider.Str(t, "access_token");
+                accountId = ClaudeCodeProvider.Str(t, "account_id");
+            }
+            if (token is null) return null;
+
+            using var req = new HttpRequestMessage(HttpMethod.Get, UsageEndpoint);
+            req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            req.Headers.Accept.ParseAdd("application/json");
+            req.Headers.UserAgent.ParseAdd("AvaCodeStats/0.2");
+            if (accountId is not null) req.Headers.Add("ChatGPT-Account-Id", accountId);
+            using var res = await http!.SendAsync(req, ct);
+            if (!res.IsSuccessStatusCode) return null; // expired sign-in etc.: the logs still work
+            return ParseLive(await res.Content.ReadAsStringAsync(ct), account, DateTimeOffset.UtcNow);
+        }
+        catch (Exception e) when (e is HttpRequestException or JsonException or IOException or TaskCanceledException)
+        {
+            return null;
+        }
+    }
+
+    /// <summary>Parses the wham/usage response (same metric ids as <see cref="ParseLimits"/>, so history joins up).</summary>
+    public static IReadOnlyList<UsageSnapshot> ParseLive(string json, string account, DateTimeOffset now)
+    {
+        using var doc = JsonDocument.Parse(json);
+        var root = doc.RootElement;
+        if (!root.TryGetProperty("rate_limit", out var rl) || rl.ValueKind != JsonValueKind.Object) return [];
+        var plan = ClaudeCodeProvider.Str(root, "plan_type");
+        var result = new List<UsageSnapshot>();
+        foreach (var (slot, name) in new[] { ("primary", "primary_window"), ("secondary", "secondary_window") })
+        {
+            if (!rl.TryGetProperty(name, out var w) || w.ValueKind != JsonValueKind.Object) continue;
+            var seconds = ClaudeCodeProvider.Num(w, "limit_window_seconds");
+            if (seconds <= 0) continue;
+            var minutes = seconds / 60;
+            var window = TimeSpan.FromSeconds(seconds);
+            var reset = DateTimeOffset.FromUnixTimeSeconds(ClaudeCodeProvider.Long(w, "reset_at"));
+            result.Add(new UsageSnapshot(Id, account, $"{slot}_{minutes:0}", WindowName(minutes),
+                ClaudeCodeProvider.Num(w, "used_percent"), 100, false, reset - window, reset, now,
+                plan is null ? null : $"ChatGPT {plan}"));
+        }
+        return result;
+    }
+
+    private static string WindowName(double minutes) => minutes switch
+    {
+        10080 => "Weekly",
+        300 => "5-hour",
+        _ => $"{TimeSpan.FromMinutes(minutes).TotalHours:0}-hour",
+    };
 
     private void ScanLogs()
     {
@@ -144,7 +210,7 @@ public sealed class CodexProvider(string account, string codexHome, TokenStore t
             // The log only knows the window it last saw; once that window ends, usage is back to 0.
             while (reset <= now) { reset += window; used = 0; }
 
-            var name = minutes switch { 10080 => "Weekly", 300 => "5-hour", _ => $"{window.TotalHours:0}-hour" };
+            var name = WindowName(minutes);
             result.Add(new UsageSnapshot(Id, account, $"{slot}_{minutes:0}", name, used, 100, false,
                 reset - window, reset, used == 0 ? now : observed, plan is null ? null : $"ChatGPT {plan}"));
         }

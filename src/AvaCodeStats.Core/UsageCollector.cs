@@ -66,17 +66,24 @@ public sealed class UsageCollector(UsageStore store, TokenStore tokens)
         Updated?.Invoke(this, EventArgs.Empty);
     }
 
-    /// <summary>The quota for the tray: the configured one, else the most used-up limited quota (premium requests first).</summary>
-    public UsageSnapshot? PickTray(string? configuredKey, Func<UsageSnapshot, bool>? include = null)
+    /// <summary>
+    /// The quota for the tray: the configured one, else the one in the most trouble
+    /// (worst pace status, then furthest over pace as a share of its quota, then most used).
+    /// </summary>
+    public UsageSnapshot? PickTray(string? configuredKey, Func<UsageSnapshot, bool>? include = null, PaceThresholds? thresholds = null)
     {
         include ??= _ => true;
         if (SubscriptionKey.TryParse(configuredKey) is { } k && _latest.TryGetValue(k, out var chosen) && include(chosen))
             return chosen;
 
+        var now = DateTimeOffset.UtcNow;
         return _latest.Values
             .Where(s => !s.Unlimited && s.Entitlement > 0 && include(s))
-            .OrderByDescending(s => s.MetricId == "premium_interactions")
-            .ThenByDescending(s => s.UsedFraction)
+            .Select(s => (s, pace: PaceCalculator.Calculate(s, now, thresholds)))
+            .OrderByDescending(x => AlertRules.Severity(x.pace.Status))
+            .ThenByDescending(x => x.pace.Delta / x.s.Entitlement)
+            .ThenByDescending(x => x.s.UsedFraction)
+            .Select(x => x.s)
             .FirstOrDefault();
     }
 }

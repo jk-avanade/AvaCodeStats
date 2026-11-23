@@ -1,0 +1,155 @@
+<UserControl x:Class="AvaCodeStats.Views.SettingsPage"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <UserControl.Resources>
+        <Style x:Key="Row" TargetType="Grid">
+            <Setter Property="Margin" Value="0,0,0,16" />
+        </Style>
+        <Style x:Key="Label" TargetType="StackPanel">
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="Margin" Value="0,0,24,0" />
+        </Style>
+    </UserControl.Resources>
+    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+        <StackPanel Margin="36,4,36,32" MaxWidth="900" HorizontalAlignment="Left" Width="900">
+
+            <TextBlock Text="Appearance" Style="{StaticResource Subtitle}" FontSize="16" Margin="0,0,0,8" />
+            <Border Style="{StaticResource Card}">
+                <StackPanel>
+                    <Grid Style="{StaticResource Row}">
+                        <Grid.ColumnDefinitions><ColumnDefinition /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                        <StackPanel Style="{StaticResource Label}">
+                            <TextBlock Text="Theme" Style="{StaticResource Body}" />
+                            <TextBlock Text="System follows your Windows setting." Style="{StaticResource Caption}" />
+                        </StackPanel>
+                        <Border Grid.Column="1" Style="{StaticResource SegmentedHost}">
+                            <StackPanel Orientation="Horizontal">
+                                <RadioButton x:Name="ThemeSystem" Style="{StaticResource Segment}" GroupName="Theme" Content="System" Tag="system" Checked="OnTheme" />
+                                <RadioButton x:Name="ThemeLight" Style="{StaticResource Segment}" GroupName="Theme" Content="Light" Tag="light" Checked="OnTheme" />
+                                <RadioButton x:Name="ThemeDark" Style="{StaticResource Segment}" GroupName="Theme" Content="Dark" Tag="dark" Checked="OnTheme" />
+                            </StackPanel>
+                        </Border>
+                    </Grid>
+                    <Grid>
+                        <Grid.ColumnDefinitions><ColumnDefinition /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                        <StackPanel Style="{StaticResource Label}">
+                            <TextBlock Text="Brand" Style="{StaticResource Body}" />
+                            <TextBlock Text="Avanade uses the Avanade design system's accent, chart colours and Aurora details." Style="{StaticResource Caption}" TextWrapping="Wrap" />
+                        </StackPanel>
+                        <Border Grid.Column="1" Style="{StaticResource SegmentedHost}">
+                            <StackPanel Orientation="Horizontal">
+                                <RadioButton x:Name="BrandDefault" Style="{StaticResource Segment}" GroupName="Brand" Content="Default" Tag="default" Checked="OnBrand" />
+                                <RadioButton x:Name="BrandAvanade" Style="{StaticResource Segment}" GroupName="Brand" Content="Avanade" Tag="avanade" Checked="OnBrand" />
+                            </StackPanel>
+                        </Border>
+                    </Grid>
+                </StackPanel>
+            </Border>
+
+            <TextBlock Text="Tray" Style="{StaticResource Subtitle}" FontSize="16" Margin="0,24,0,8" />
+            <Border Style="{StaticResource Card}">
+                <StackPanel>
+                    <Grid Style="{StaticResource Row}">
+                        <Grid.ColumnDefinitions><ColumnDefinition /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                        <StackPanel Style="{StaticResource Label}">
+                            <TextBlock Text="Tray profile" Style="{StaticResource Body}" />
+                            <TextBlock Text="The ring and the summary popup show this profile." Style="{StaticResource Caption}" />
+                        </StackPanel>
+                        <Border Grid.Column="1" Style="{StaticResource SegmentedHost}">
+                            <StackPanel Orientation="Horizontal">
+                                <RadioButton x:Name="TrayWork" Style="{StaticResource Segment}" GroupName="TrayProfile" Content="Work" Tag="work" Checked="OnTrayProfile" />
+                                <RadioButton x:Name="TrayPersonal" Style="{StaticResource Segment}" GroupName="TrayProfile" Content="Personal" Tag="personal" Checked="OnTrayProfile" />
+                                <RadioButton x:Name="TrayUnified" Style="{StaticResource Segment}" GroupName="TrayProfile" Content="All" Tag="unified" Checked="OnTrayProfile" />
+                            </StackPanel>
+                        </Border>
+                    </Grid>
+                    <Grid Style="{StaticResource Row}">
+                        <Grid.ColumnDefinitions><ColumnDefinition /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                        <StackPanel Style="{StaticResource Label}">
+                            <TextBlock Text="Ring shows" Style="{StaticResource Body}" />
+                            <TextBlock Text="Automatic picks the quota furthest over pace." Style="{StaticResource Caption}" />
+                        </StackPanel>
+                        <ComboBox x:Name="TrayQuota" Grid.Column="1" MinWidth="300" SelectionChanged="OnTrayQuota" />
+                    </Grid>
+                    <CheckBox x:Name="StartWithWindows" Content="Start with Windows" Click="OnStartWithWindows" />
+                </StackPanel>
+            </Border>
+
+            <TextBlock Text="Alerts" Style="{StaticResource Subtitle}" FontSize="16" Margin="0,24,0,8" />
+            <Border Style="{StaticResource Card}">
+                <StackPanel>
+                    <Grid Style="{StaticResource Row}">
+                        <Grid.ColumnDefinitions><ColumnDefinition /><ColumnDefinition Width="260" /><ColumnDefinition Width="56" /></Grid.ColumnDefinitions>
+                        <StackPanel Style="{StaticResource Label}">
+                            <TextBlock Text="Heads-up at" Style="{StaticResource Body}" />
+                            <TextBlock Text="Notify once per period when a quota passes this much used." Style="{StaticResource Caption}" />
+                        </StackPanel>
+                        <Slider x:Name="WarnSlider" Grid.Column="1" Minimum="0" Maximum="100" TickFrequency="5" IsSnapToTickEnabled="True" VerticalAlignment="Center" ValueChanged="OnThreshold" />
+                        <TextBlock x:Name="WarnValue" Grid.Column="2" Style="{StaticResource BodyStrong}" HorizontalAlignment="Right" VerticalAlignment="Center" />
+                    </Grid>
+                    <Grid Style="{StaticResource Row}">
+                        <Grid.ColumnDefinitions><ColumnDefinition /><ColumnDefinition Width="260" /><ColumnDefinition Width="56" /></Grid.ColumnDefinitions>
+                        <StackPanel Style="{StaticResource Label}">
+                            <TextBlock Text="Critical at" Style="{StaticResource Body}" />
+                            <TextBlock Text="0 turns an alert off." Style="{StaticResource Caption}" />
+                        </StackPanel>
+                        <Slider x:Name="CriticalSlider" Grid.Column="1" Minimum="0" Maximum="100" TickFrequency="5" IsSnapToTickEnabled="True" VerticalAlignment="Center" ValueChanged="OnThreshold" />
+                        <TextBlock x:Name="CriticalValue" Grid.Column="2" Style="{StaticResource BodyStrong}" HorizontalAlignment="Right" VerticalAlignment="Center" />
+                    </Grid>
+                    <CheckBox x:Name="FarOverPace" Content="Also notify when a quota is far over pace" Click="OnFarOverPace" />
+                </StackPanel>
+            </Border>
+
+            <TextBlock Text="Subscriptions" Style="{StaticResource Subtitle}" FontSize="16" Margin="0,24,0,8" />
+            <Border Style="{StaticResource Card}" Padding="20,12">
+                <StackPanel>
+                    <ItemsControl x:Name="Subscriptions" Focusable="False">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Grid Margin="0,6">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="18" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <Ellipse Width="9" Height="9" Fill="{Binding Dot}" VerticalAlignment="Center" HorizontalAlignment="Left" />
+                                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                        <TextBlock Text="{Binding Name}" Style="{StaticResource Body}" />
+                                        <TextBlock Text="{Binding Source}" Style="{StaticResource Caption}" />
+                                    </StackPanel>
+                                    <ComboBox Grid.Column="2" Width="140" Margin="0,0,16,0" VerticalAlignment="Center"
+                                              ItemsSource="{Binding ProfileChoices}" SelectedItem="{Binding Profile, Mode=TwoWay}" />
+                                    <CheckBox Grid.Column="3" Content="Track" IsChecked="{Binding Enabled, Mode=TwoWay}" VerticalAlignment="Center" />
+                                </Grid>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                    <TextBlock Style="{StaticResource Caption}" Margin="0,8,0,4" TextWrapping="Wrap"
+                               Text="GitHub accounts come from the GitHub CLI (gh auth login). Claude and Codex use their own sign-ins on this PC." />
+                </StackPanel>
+            </Border>
+
+            <TextBlock Text="Data" Style="{StaticResource Subtitle}" FontSize="16" Margin="0,24,0,8" />
+            <Border Style="{StaticResource Card}">
+                <StackPanel>
+                    <Grid Style="{StaticResource Row}">
+                        <Grid.ColumnDefinitions><ColumnDefinition /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                        <StackPanel Style="{StaticResource Label}">
+                            <TextBlock Text="Check every" Style="{StaticResource Body}" />
+                            <TextBlock Text="How often usage is read in the background." Style="{StaticResource Caption}" />
+                        </StackPanel>
+                        <ComboBox x:Name="PollMinutes" Grid.Column="1" Width="140" SelectionChanged="OnPoll" />
+                    </Grid>
+                    <CheckBox x:Name="CodexLive" Margin="0,0,0,16" Click="OnCodexLive"
+                              Content="Read Codex limits live from ChatGPT (otherwise only from Codex's logs)" />
+                    <StackPanel Orientation="Horizontal">
+                        <Button Content="Open settings file" Click="OnOpenSettings" />
+                        <Button Content="Reload settings" Margin="8,0,0,0" Click="OnReload" />
+                        <Button Content="Open data folder" Margin="8,0,0,0" Click="OnOpenData" />
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

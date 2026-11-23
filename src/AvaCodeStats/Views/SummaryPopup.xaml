@@ -1,0 +1,75 @@
+<Window x:Class="AvaCodeStats.Views.SummaryPopup"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:c="clr-namespace:AvaCodeStats.Controls"
+        Title="AvaCodeStats summary" Width="380" SizeToContent="Height"
+        WindowStyle="None" ResizeMode="NoResize" ShowInTaskbar="False" Topmost="True"
+        ShowActivated="True" Background="{DynamicResource SolidBackgroundFillColorBaseBrush}">
+    <Border BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}" BorderThickness="1">
+        <StackPanel>
+            <!-- Header -->
+            <Grid Margin="16,14,10,8">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <StackPanel VerticalAlignment="Center">
+                    <TextBlock Text="AvaCodeStats" Style="{StaticResource BodyStrong}" />
+                    <Border Style="{StaticResource Aurora}" Width="40" Margin="0,5,0,0" />
+                </StackPanel>
+                <Border Grid.Column="1" Style="{StaticResource SegmentedHost}">
+                    <StackPanel Orientation="Horizontal">
+                        <RadioButton x:Name="Work" Style="{StaticResource Segment}" GroupName="PopupProfile" Content="Work" Tag="work" Checked="OnProfile" />
+                        <RadioButton x:Name="Personal" Style="{StaticResource Segment}" GroupName="PopupProfile" Content="Personal" Tag="personal" Checked="OnProfile" />
+                        <RadioButton x:Name="All" Style="{StaticResource Segment}" GroupName="PopupProfile" Content="All" Tag="unified" Checked="OnProfile" />
+                    </StackPanel>
+                </Border>
+                <Button x:Name="RefreshButton" Grid.Column="2" Style="{StaticResource IconButton}" Content="&#xE72C;" Margin="4,0,0,0" ToolTip="Refresh now" Click="OnRefresh" />
+            </Grid>
+
+            <TextBlock x:Name="Empty" Style="{StaticResource Caption}" Margin="16,8,16,16" TextWrapping="Wrap" Visibility="Collapsed" />
+
+            <ItemsControl x:Name="Items" Margin="8,0,8,4" Focusable="False">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <Border Style="{StaticResource ClickableCard}" Padding="12,10" Margin="0,0,0,6" CornerRadius="6"
+                                MouseLeftButtonUp="OnItem" ToolTip="{Binding ResetTooltip}">
+                            <StackPanel>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <Ellipse Width="8" Height="8" Fill="{Binding ProviderBrush}" VerticalAlignment="Center" />
+                                    <TextBlock Grid.Column="1" Text="{Binding ShortTitle}" Style="{StaticResource BodyStrong}" FontSize="13" Margin="8,0,8,0" TextTrimming="CharacterEllipsis" />
+                                    <StackPanel Grid.Column="2" Orientation="Horizontal">
+                                        <TextBlock Text="{Binding LeftPercent}" Style="{StaticResource BodyStrong}" FontSize="13" />
+                                        <TextBlock Text=" left" Style="{StaticResource Caption}" VerticalAlignment="Bottom" />
+                                    </StackPanel>
+                                </Grid>
+                                <c:LimitBar Left="{Binding LeftFraction}" TimeLeft="{Binding TimeLeftFraction}" Status="{Binding Status}" Height="8" Margin="0,8,0,6" />
+                                <Grid>
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Text="{Binding StatusGlyph}" Style="{StaticResource Glyph}" FontSize="11" Foreground="{Binding StatusBrush}" />
+                                        <TextBlock Text="{Binding PaceText}" Style="{StaticResource Caption}" Foreground="{Binding StatusBrush}" Margin="5,0,0,0" />
+                                    </StackPanel>
+                                    <TextBlock Text="{Binding ResetText}" Style="{StaticResource Caption}" HorizontalAlignment="Right" />
+                                </Grid>
+                            </StackPanel>
+                        </Border>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+
+            <!-- Footer -->
+            <Border BorderBrush="{DynamicResource DividerStrokeColorDefaultBrush}" BorderThickness="0,1,0,0" Padding="16,10">
+                <Grid>
+                    <TextBlock x:Name="Updated" Style="{StaticResource Caption}" VerticalAlignment="Center" />
+                    <Button Content="Open dashboard" Style="{DynamicResource AccentButtonStyle}" HorizontalAlignment="Right" Click="OnOpen" />
+                </Grid>
+            </Border>
+        </StackPanel>
+    </Border>
+</Window>

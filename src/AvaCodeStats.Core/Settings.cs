@@ -54,10 +54,19 @@ public sealed class AppSettings
     /// <summary>Profile shown in the tray and dashboard: "work", "personal" or "unified".</summary>
     public string ActiveProfile { get; set; } = Profiles.Work;
 
+    /// <summary>Profile the tray ring and the summary popup follow ("work", "personal" or "unified").</summary>
+    public string TrayProfile { get; set; } = Profiles.Work;
+
+    /// <summary>"system", "light" or "dark".</summary>
+    public string ThemeMode { get; set; } = "system";
+
+    /// <summary>"default" or "avanade" (accent, chart palette and signature details).</summary>
+    public string Brand { get; set; } = "default";
+
     /// <summary>Subscriptions to track. Empty = discover GitHub CLI accounts, Claude Code and Codex on startup.</summary>
     public List<SubscriptionConfig> Subscriptions { get; set; } = [];
 
-    /// <summary>Quota shown in the tray per profile, "provider:account:metric". Missing = pick automatically.</summary>
+    /// <summary>Quota shown in the tray per profile, "provider:account:metric". Missing = the one most over pace.</summary>
     public Dictionary<string, string> TrayKeys { get; set; } = [];
 
     /// <summary>Extra or replacement model prices (USD per million tokens) for the cost estimate.</summary>
@@ -66,7 +75,16 @@ public sealed class AppSettings
     public double OnPaceDays { get; set; } = 0.5;
     public double FarOverDays { get; set; } = 2.0;
 
+    /// <summary>Notify once per period when a quota's use crosses this percentage.</summary>
+    public int WarnAtPercent { get; set; } = 75;
+
+    /// <summary>Notify once per period when a quota's use crosses this percentage.</summary>
+    public int CriticalAtPercent { get; set; } = 90;
+
     public bool NotifyWhenFarOverPace { get; set; } = true;
+
+    /// <summary>Ask Codex's own usage endpoint for live limits (falls back to its logs).</summary>
+    public bool CodexLiveUsage { get; set; } = true;
 
     [JsonIgnore]
     public PaceThresholds Thresholds => new(OnPaceDays, FarOverDays);
@@ -75,12 +93,14 @@ public sealed class AppSettings
     public string ProfileOf(string providerId, string accountId) =>
         Subscriptions.FirstOrDefault(s => s.Provider == providerId && s.Account == accountId)?.Profile ?? Profiles.Personal;
 
-    public bool InActiveProfile(string providerId, string accountId) =>
-        ActiveProfile == Profiles.Unified || ProfileOf(providerId, accountId) == ActiveProfile;
+    public bool InProfile(string profile, string providerId, string accountId) =>
+        profile == Profiles.Unified || ProfileOf(providerId, accountId) == profile;
 
-    /// <summary>Token log sources ("provider:account") visible in the active profile.</summary>
-    public IReadOnlySet<string> ActiveSources() =>
-        Subscriptions.Where(s => s.Enabled && InActiveProfile(s.Provider, s.Account)).Select(s => s.Source).ToHashSet();
+    public bool InActiveProfile(string providerId, string accountId) => InProfile(ActiveProfile, providerId, accountId);
+
+    /// <summary>Token log sources ("provider:account") visible in <paramref name="profile"/> (default: the active one).</summary>
+    public IReadOnlySet<string> ActiveSources(string? profile = null) =>
+        Subscriptions.Where(s => s.Enabled && InProfile(profile ?? ActiveProfile, s.Provider, s.Account)).Select(s => s.Source).ToHashSet();
 
     public static string DataDirectory { get; } =
         Environment.GetEnvironmentVariable("AVACODESTATS_DATA")

@@ -20,14 +20,14 @@ public static class ProviderFactory
 
     public static string DisplayName(string providerId) => DisplayNames.GetValueOrDefault(providerId, providerId);
 
-    public static IUsageProvider Create(SubscriptionConfig config, TokenStore tokens) => config.Provider switch
+    public static IUsageProvider Create(SubscriptionConfig config, TokenStore tokens, bool codexLive = true) => config.Provider switch
     {
         CopilotQuotaParser.ProviderId => new GitHubCopilotProvider(config.Account, TokenSource(config), Http)
         {
             IncludeUnlimited = config.IncludeUnlimited,
         },
         ClaudeCodeProvider.Id => new ClaudeCodeProvider(config.Account, Home(config, ClaudeCodeProvider.DefaultHome), tokens, Http),
-        CodexProvider.Id => new CodexProvider(config.Account, Home(config, CodexProvider.DefaultHome), tokens),
+        CodexProvider.Id => new CodexProvider(config.Account, Home(config, CodexProvider.DefaultHome), tokens, Http, codexLive),
         _ => throw new NotSupportedException($"Unknown provider '{config.Provider}'."),
     };
 
