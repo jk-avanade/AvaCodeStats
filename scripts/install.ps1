@@ -1,5 +1,6 @@
 # Publishes AvaCodeStats to %LOCALAPPDATA%\Programs\AvaCodeStats and starts it.
-# Re-run after pulling changes. "Start with Windows" (tray menu) points at this installed copy.
+# Re-run after pulling changes. The installed copy registers itself to start with Windows
+# (turn it off in Settings; a dev build from bin never registers itself).
 param([switch]$NoStart)
 
 $ErrorActionPreference = 'Stop'

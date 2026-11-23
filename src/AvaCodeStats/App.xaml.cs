@@ -31,6 +31,7 @@ public partial class App : Application
         TaskScheduler.UnobservedTaskException += (_, args) => { CrashLog.Write(args.Exception); args.SetObserved(); };
 
         _host = new AppHost();
+        StartupRegistration.Sync(_host.Settings.StartWithWindows);
         _host.Start();
 
         var args = e.Args;

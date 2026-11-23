@@ -112,7 +112,13 @@ public partial class SettingsPage : UserControl, IPage
         _host.SaveSettings();
     }
 
-    private void OnStartWithWindows(object sender, RoutedEventArgs e) => StartupRegistration.Set(StartWithWindows.IsChecked == true);
+    private void OnStartWithWindows(object sender, RoutedEventArgs e)
+    {
+        var on = StartWithWindows.IsChecked == true;
+        StartupRegistration.Set(on);
+        _host.Settings.StartWithWindows = on;
+        _host.SaveSettings();
+    }
 
     private void OnThreshold(object sender, RoutedPropertyChangedEventArgs<double> e)
     {

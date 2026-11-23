@@ -91,6 +91,9 @@ public sealed class AppSettings
     /// <summary>Ask Codex's own usage endpoint for live limits (falls back to its logs).</summary>
     public bool CodexLiveUsage { get; set; } = true;
 
+    /// <summary>Start with Windows (installed copy only). On by default; turning it off in Settings sticks.</summary>
+    public bool StartWithWindows { get; set; } = true;
+
     [JsonIgnore]
     public PaceThresholds Thresholds => new(OnPaceDays, FarOverDays);
 
