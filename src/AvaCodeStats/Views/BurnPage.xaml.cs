@@ -5,7 +5,6 @@ using AvaCodeStats.Controls;
 using AvaCodeStats.Core;
 using AvaCodeStats.Core.Providers.GitHubCopilot;
 using AvaCodeStats.Theming;
-using SP = ScottPlot;
 
 namespace AvaCodeStats.Views;
 
@@ -125,136 +124,93 @@ public partial class BurnPage : UserControl, IPage
             new Kpi("Resets in", Fmt.Countdown(snap.PeriodEndUtc - now), $"{end:ddd d MMM HH:mm}", text),
         };
 
-        // A fresh plot each time: the tabs use different axis types (dates vs. periods), and a
-        // date axis cannot be switched back to numeric ticks in place.
-        Chart.Reset();
-        var plot = Chart.Plot;
-        ChartStyle.Apply(plot);
-        if (TabDaily.IsChecked == true) DrawDaily(plot, snap, samples, pace);
-        else if (TabHistory.IsChecked == true) DrawHistory(plot, snap);
-        else DrawPeriod(plot, snap, samples, pace, now);
-        Chart.Refresh();
+        Chart.Model = TabDaily.IsChecked == true ? DailyModel(snap, samples, pace)
+            : TabHistory.IsChecked == true ? HistoryModel(snap)
+            : PeriodModel(snap, samples, pace, now);
     }
 
-    private static SP.Color Sp(Color c, byte? a = null) => ChartStyle.Sp(c, a);
-
-    private static void DrawPeriod(SP.Plot plot, UsageSnapshot snap, IReadOnlyList<UsageSnapshot> samples, PaceInfo pace, DateTimeOffset now)
+    private static ChartModel PeriodModel(UsageSnapshot snap, IReadOnlyList<UsageSnapshot> samples, PaceInfo pace, DateTimeOffset now)
     {
         var p = ThemeService.Current;
-        var start = snap.PeriodStartUtc.LocalDateTime;
-        var end = snap.PeriodEndUtc.LocalDateTime;
-        var nowLocal = now.LocalDateTime;
+        var start = snap.PeriodStartUtc.LocalDateTime.ToOADate();
+        var end = snap.PeriodEndUtc.LocalDateTime.ToOADate();
+        var nowX = now.LocalDateTime.ToOADate();
+        var status = p.ForStatus(pace.Status);
 
-        var quota = plot.Add.HorizontalLine(snap.Entitlement);
-        quota.Color = Sp(p.Bad, 140);
-        quota.LinePattern = SP.LinePattern.Dashed;
-        quota.LineWidth = 1;
-        quota.LegendText = "Quota";
-
-        var even = plot.Add.Scatter(new[] { start, end }, new[] { 0, snap.Entitlement });
-        even.LegendText = "Even pace";
-        even.Color = Sp(p.TextSecondary);
-        even.LinePattern = SP.LinePattern.Dashed;
-        even.MarkerSize = 0;
-
-        var xs = new List<DateTime> { start };
+        // Usage is 0 at the reset; then every reading; then now.
+        var xs = new List<double> { start };
         var ys = new List<double> { 0 };
-        foreach (var s in samples) { xs.Add(s.TimestampUtc.LocalDateTime); ys.Add(s.Used); }
-        xs.Add(nowLocal); ys.Add(snap.Used);
-        var used = plot.Add.Scatter(xs.ToArray(), ys.ToArray());
-        used.LegendText = "Used";
-        used.Color = Sp(p.ForStatus(pace.Status));
-        used.LineWidth = 3;
-        used.MarkerSize = 0;
-        used.FillY = true;
-        used.FillYColor = Sp(p.ForStatus(pace.Status), 40);
+        foreach (var s in samples) { xs.Add(s.TimestampUtc.LocalDateTime.ToOADate()); ys.Add(s.Used); }
+        xs.Add(nowX); ys.Add(snap.Used);
 
-        var projection = plot.Add.Scatter(new[] { nowLocal, end }, new[] { snap.Used, pace.ProjectedUsedAtReset });
-        projection.LegendText = "Projection";
-        projection.Color = Sp(p.ForStatus(pace.Status), 170);
-        projection.LinePattern = SP.LinePattern.Dotted;
-        projection.LineWidth = 2;
-        projection.MarkerSize = 0;
-
-        var nowLine = plot.Add.VerticalLine(nowLocal.ToOADate());
-        nowLine.Color = Sp(p.TextSecondary, 120);
-        nowLine.LineWidth = 1;
-        nowLine.Text = "Now";
-        nowLine.LabelFontColor = Sp(p.Text);
-        nowLine.LabelBackgroundColor = SP.Colors.Transparent;
-
-        ChartStyle.DateAxis(plot);
-        plot.Axes.SetLimits(start.ToOADate(), end.ToOADate(), 0, Math.Max(snap.Entitlement, pace.ProjectedUsedAtReset) * 1.08);
-        plot.ShowLegend(SP.Alignment.UpperLeft);
+        var m = new ChartModel
+        {
+            XKind = XAxisKind.Days, XMin = start, XMax = end, NowX = nowX,
+            YMax = Math.Max(snap.Entitlement, pace.ProjectedUsedAtReset) * 1.05,
+            FormatY = v => Amount(snap, v), FormatValue = v => Amount(snap, v),
+        };
+        m.Series.Add(new ChartSeries { Name = "Used", Color = status, X = xs.ToArray(), Y = ys.ToArray(), Kind = SeriesKind.Area, Thickness = 2.5 });
+        m.Series.Add(new ChartSeries { Name = "Even pace", Color = p.TextSecondary, X = [start, end], Y = [0, snap.Entitlement], Dashed = true, Thickness = 1.5 });
+        m.Series.Add(new ChartSeries { Name = "Projection", Color = status, X = [nowX, end], Y = [snap.Used, pace.ProjectedUsedAtReset], Dashed = true, Thickness = 2, InTooltip = false });
+        m.Lines.Add(new ReferenceLine(snap.Entitlement, $"Quota {Amount(snap, snap.Entitlement)}", p.Bad));
+        return m;
     }
 
-    private static void DrawDaily(SP.Plot plot, UsageSnapshot snap, IReadOnlyList<UsageSnapshot> samples, PaceInfo pace)
+    private static ChartModel DailyModel(UsageSnapshot snap, IReadOnlyList<UsageSnapshot> samples, PaceInfo pace)
     {
         var p = ThemeService.Current;
         var days = UsageAnalytics.DailyBurns(samples.Append(snap).ToList(), snap.PeriodStartUtc, snap.PeriodEndUtc, TimeZoneInfo.Local);
-        var bars = days.Select(d => new SP.Bar
+        var first = snap.PeriodStartUtc.LocalDateTime.Date;
+        var last = snap.PeriodEndUtc.LocalDateTime.Date;
+        var m = new ChartModel
         {
-            Position = d.Day.ToDateTime(new TimeOnly(12, 0)).ToOADate(),
-            Value = d.Burned,
-            Size = 0.7,
-            FillColor = d.Estimated ? Sp(p.Neutral, 90)
-                : Sp(d.Burned > pace.DailyAllowance * 1.5 ? p.Bad : d.Burned > pace.DailyAllowance ? p.Warn : p.Good, 220),
-            LineWidth = 0,
-        }).ToList();
-        if (bars.Count > 0) plot.Add.Bars(bars);
-        if (days.Any(d => d.Estimated))
-            plot.Legend.ManualItems.Add(new SP.LegendItem { LabelText = "Estimated (no readings those days)", FillColor = Sp(p.Neutral, 90) });
-
-        var even = plot.Add.HorizontalLine(pace.DailyAllowance);
-        even.Color = Sp(p.TextSecondary);
-        even.LinePattern = SP.LinePattern.Dashed;
-        even.LineWidth = 1;
-        even.LegendText = $"Even pace {Amount(snap, pace.DailyAllowance)}/day";
-
-        var budget = plot.Add.HorizontalLine(pace.DailyBudgetLeft);
-        budget.Color = Sp(p.Series[0]);
-        budget.LinePattern = SP.LinePattern.Dotted;
-        budget.LineWidth = 2;
-        budget.LegendText = $"Budget left {Amount(snap, pace.DailyBudgetLeft)}/day";
-
-        ChartStyle.DateAxis(plot);
-        var max = Math.Max(pace.DailyAllowance * 2, days.Count > 0 ? days.Max(d => d.Burned) : 0);
-        plot.Axes.SetLimits(snap.PeriodStartUtc.LocalDateTime.Date.ToOADate(), snap.PeriodEndUtc.LocalDateTime.Date.AddDays(1).ToOADate(), 0, Math.Max(1, max) * 1.12);
-        plot.ShowLegend(SP.Alignment.UpperRight);
+            XKind = XAxisKind.Days, XMin = first.ToOADate(), XMax = last.AddDays(1).ToOADate(), BarWidth = 0.72,
+            YMax = Math.Max(Math.Max(pace.DailyAllowance, pace.DailyBudgetLeft) * 1.3, days.Select(d => d.Burned).DefaultIfEmpty(0).Max() * 1.1),
+            FormatY = v => Amount(snap, v), FormatValue = v => Amount(snap, v),
+        };
+        m.Series.Add(new ChartSeries
+        {
+            Name = "Burned", Color = p.Good, Kind = SeriesKind.Bars,
+            X = days.Select(d => d.Day.ToDateTime(new TimeOnly(12, 0)).ToOADate()).ToArray(),
+            Y = days.Select(d => d.Burned).ToArray(),
+            BarColors = days.Select(d => d.Estimated ? Color.FromArgb(120, p.Neutral.R, p.Neutral.G, p.Neutral.B)
+                : d.Burned > pace.DailyAllowance * 1.5 ? p.Bad : d.Burned > pace.DailyAllowance ? p.Warn : p.Good).ToArray(),
+            InLegend = false,
+        });
+        m.LegendExtras.Add(("Under pace", p.Good, true));
+        m.LegendExtras.Add(("Over pace", p.Warn, true));
+        m.LegendExtras.Add(("Well over", p.Bad, true));
+        if (days.Any(d => d.Estimated)) m.LegendExtras.Add(("Estimated (no readings)", Color.FromArgb(120, p.Neutral.R, p.Neutral.G, p.Neutral.B), true));
+        m.Lines.Add(new ReferenceLine(pace.DailyAllowance, $"Even pace {Amount(snap, pace.DailyAllowance)}/day", p.TextSecondary));
+        m.Lines.Add(new ReferenceLine(pace.DailyBudgetLeft, $"Budget left {Amount(snap, pace.DailyBudgetLeft)}/day", p.Series[0]));
+        return m;
     }
 
-    private void DrawHistory(SP.Plot plot, UsageSnapshot snap)
+    private ChartModel HistoryModel(UsageSnapshot snap)
     {
         var p = ThemeService.Current;
         var monthly = (snap.PeriodEndUtc - snap.PeriodStartUtc).TotalDays >= 27;
-        var periods = _host.Collector.Store.GetPeriodSummaries(snap.Key);
-        var bars = new List<SP.Bar>();
-        var ticks = new List<SP.Tick>();
-        for (var i = 0; i < periods.Count; i++)
+        var periods = _host.Collector.Store.GetPeriodSummaries(snap.Key).TakeLast(12).ToList();
+        var labels = periods.Select(x => x.PeriodStartUtc.ToLocalTime().ToString(monthly ? "MMM yyyy" : "d MMM")).ToArray();
+        var m = new ChartModel
         {
-            var period = periods[i];
-            var current = period.PeriodStartUtc == snap.PeriodStartUtc;
-            var pct = period.UsedFraction * 100;
-            bars.Add(new SP.Bar
-            {
-                Position = i, Value = pct, Size = 0.55, LineWidth = 0,
-                FillColor = current ? Sp(p.Series[0]) : Sp(pct >= 100 ? p.Bad : pct >= 85 ? p.Warn : p.Good, 220),
-                Label = IsPercent(snap) ? $"{pct:0}%" : $"{period.Used:N0}",
-            });
-            ticks.Add(new SP.Tick(i, period.PeriodStartUtc.ToLocalTime().ToString(monthly ? "MMM yyyy" : "d MMM") + (current ? " (now)" : ""), true));
-        }
-        if (bars.Count > 0) plot.Add.Bars(bars).ValueLabelStyle.ForeColor = Sp(p.Text);
-
-        var full = plot.Add.HorizontalLine(100);
-        full.Color = Sp(p.Bad, 140);
-        full.LinePattern = SP.LinePattern.Dashed;
-        full.LineWidth = 1;
-        full.LegendText = "Whole quota";
-
-        plot.Axes.Bottom.TickGenerator = new SP.TickGenerators.NumericManual(ticks.ToArray());
-        plot.Axes.Left.Label.Text = "% of quota used";
-        plot.Axes.Left.Label.ForeColor = Sp(p.TextSecondary);
-        plot.Axes.SetLimits(-0.75, Math.Max(periods.Count, 6) - 0.25, 0, 118);
-        plot.ShowLegend(SP.Alignment.UpperRight);
+            XKind = XAxisKind.Categories, Categories = labels, XMin = -0.6, XMax = Math.Max(periods.Count, 4) - 0.4,
+            YMax = 110, BarWidth = 0.55, FormatY = v => $"{v:0}%", FormatValue = v => $"{v:0.#}% used",
+            EmptyText = "History builds up as periods complete.",
+        };
+        m.Series.Add(new ChartSeries
+        {
+            Name = "Used at end of period", Color = p.Series[0], Kind = SeriesKind.Bars,
+            X = periods.Select((_, i) => (double)i).ToArray(),
+            Y = periods.Select(x => x.UsedFraction * 100).ToArray(),
+            BarColors = periods.Select(x => x.PeriodStartUtc == snap.PeriodStartUtc ? p.Series[0]
+                : x.UsedFraction >= 1 ? p.Bad : x.UsedFraction >= 0.85 ? p.Warn : p.Good).ToArray(),
+            BarLabels = periods.Select(x => IsPercent(snap) ? $"{x.UsedFraction * 100:0}%" : $"{x.Used:N0}").ToArray(),
+            InLegend = false,
+        });
+        m.LegendExtras.Add(("This period", p.Series[0], true));
+        m.LegendExtras.Add(("Earlier periods", p.Good, true));
+        m.Lines.Add(new ReferenceLine(100, "Whole quota", p.Bad));
+        return m;
     }
 }

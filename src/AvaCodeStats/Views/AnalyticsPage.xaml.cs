@@ -5,7 +5,6 @@ using AvaCodeStats.Controls;
 using AvaCodeStats.Core;
 using AvaCodeStats.Core.Tokens;
 using AvaCodeStats.Theming;
-using SP = ScottPlot;
 
 namespace AvaCodeStats.Views;
 
@@ -134,36 +133,27 @@ public partial class AnalyticsPage : UserControl, IPage
     private void DrawChart(TokenReport rep, TimeSpan bucket)
     {
         var p = ThemeService.Current;
-        ChartTitle.Text = (bucket < TimeSpan.FromDays(1) ? "Hourly " : "Daily ") + (IsCost ? "cost" : "processed tokens");
-        Chart.Reset();
-        var plot = Chart.Plot;
-        ChartStyle.Apply(plot);
-        var xs = rep.Buckets.Select(b => b.StartUtc.LocalDateTime).ToArray();
-        foreach (var provider in rep.ByProvider.Select(g => g.Key).Reverse())
+        var hourly = bucket < TimeSpan.FromDays(1);
+        ChartTitle.Text = (hourly ? "Hourly " : "Daily ") + (IsCost ? "cost" : "processed tokens");
+        var xs = rep.Buckets.Select(b => b.StartUtc.LocalDateTime.ToOADate()).ToArray();
+        var m = new ChartModel
         {
-            if (xs.Length == 0) break;
-            var ys = rep.Buckets.Select(b => b.ByProvider.TryGetValue(provider, out var v) ? Value(v) : 0).ToArray();
-            var color = p.ForProvider(provider);
-            var s = plot.Add.Scatter(xs, ys);
-            s.Color = ChartStyle.Sp(color);
-            s.LineWidth = 2.5f;
-            s.MarkerSize = 0;
-            s.Smooth = true;
-            s.FillY = true;
-            s.FillYColor = ChartStyle.Sp(color, 45);
-            s.LegendText = ProviderFactory.DisplayName(provider);
-        }
-        ChartStyle.DateAxis(plot, hours: bucket < TimeSpan.FromDays(1));
-        plot.Axes.Left.TickGenerator = new SP.TickGenerators.NumericAutomatic
-        {
-            LabelFormatter = v => IsCost ? (v == 0 ? "0" : $"${v:0.##}") : Fmt.Tokens(v),
+            XKind = hourly ? XAxisKind.Hours : XAxisKind.Days,
+            XMin = xs.Length > 0 ? xs[0] : 0, XMax = xs.Length > 1 ? xs[^1] : 1,
+            FormatY = v => IsCost ? (v == 0 ? "$0" : $"${v:0.##}") : Fmt.Tokens(v),
+            FormatValue = v => IsCost ? Fmt.Money(v) : Fmt.Tokens(v),
+            EmptyText = "No Claude Code or Codex activity in this range.",
         };
-        var max = rep.Buckets.Count == 0 ? 0 : rep.Buckets.Max(b => b.ByProvider.Values.Select(Value).DefaultIfEmpty(0).Max());
-        if (xs.Length > 1) plot.Axes.SetLimits(xs[0].ToOADate(), xs[^1].ToOADate(), 0, Math.Max(max * 1.15, IsCost ? 1 : 1000));
-        plot.ShowLegend(SP.Alignment.UpperLeft);
-        Chart.Refresh();
+        foreach (var provider in rep.ByProvider.OrderByDescending(g => Value(g.Totals)).Select(g => g.Key))
+        {
+            m.Series.Add(new ChartSeries
+            {
+                Name = ProviderFactory.DisplayName(provider), Color = p.ForProvider(provider), Kind = SeriesKind.Area, Smooth = true, Thickness = 2.25,
+                X = xs, Y = rep.Buckets.Select(b => b.ByProvider.TryGetValue(provider, out var v) ? Value(v) : 0).ToArray(),
+            });
+        }
+        Chart.Model = m;
     }
-
     private void FillRows()
     {
         if (_report is not { } rep) return;
