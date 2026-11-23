@@ -2,6 +2,7 @@ using System.Windows.Media;
 using AvaCodeStats.Core;
 using AvaCodeStats.Core.Providers.GitHubCopilot;
 using AvaCodeStats.Theming;
+using AvaCodeStats.Tray;
 
 namespace AvaCodeStats.Views;
 
@@ -14,7 +15,9 @@ internal sealed class LimitItem(UsageSnapshot snapshot, PaceInfo pace, DateTimeO
 
     public string Provider => ProviderFactory.DisplayName(Snapshot.ProviderId);
     public string Title => Snapshot.MetricName;
-    public string ShortTitle => $"{Provider} · {Snapshot.MetricName}";
+    /// <summary>Set when the list holds several accounts of this provider, so rows can be told apart.</summary>
+    public bool ShowAccount { get; set; }
+    public string ShortTitle => $"{Provider} · {Snapshot.MetricName}" + (ShowAccount ? $" ({Snapshot.AccountId})" : "");
     public double LeftFraction => 1 - Math.Clamp(Snapshot.UsedFraction, 0, 1);
     public double TimeLeftFraction => 1 - Pace.ElapsedFraction;
     public string LeftPercent => $"{LeftFraction * 100:0}%";
@@ -51,7 +54,13 @@ internal sealed class LimitItem(UsageSnapshot snapshot, PaceInfo pace, DateTimeO
             .OrderBy(x => x.ProviderId).ThenBy(x => x.AccountId)
             .ThenBy(x => x.PeriodEndUtc - x.PeriodStartUtc).ThenBy(x => x.MetricName)
             .Select(x => new LimitItem(x, PaceCalculator.Calculate(x, now, s.Thresholds), now))
-            .ToList();
+            .ToList()
+            .With(list =>
+            {
+                var multi = list.GroupBy(i => i.Snapshot.ProviderId).Where(g => g.Select(i => i.Snapshot.AccountId).Distinct().Count() > 1)
+                    .Select(g => g.Key).ToHashSet();
+                foreach (var i in list) i.ShowAccount = multi.Contains(i.Snapshot.ProviderId);
+            });
     }
 }
 

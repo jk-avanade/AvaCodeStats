@@ -6,9 +6,9 @@
         WindowStyle="None" ResizeMode="NoResize" ShowInTaskbar="False" Topmost="True"
         ShowActivated="True" Background="{DynamicResource SolidBackgroundFillColorBaseBrush}">
     <Border BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}" BorderThickness="1">
-        <StackPanel>
-            <!-- Header -->
-            <Grid Margin="16,14,10,8">
+        <!-- Header and footer stay put; the list scrolls when the window hits its max height. -->
+        <DockPanel>
+            <Grid DockPanel.Dock="Top" Margin="16,14,10,8">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="Auto" />
@@ -28,48 +28,49 @@
                 <Button x:Name="RefreshButton" Grid.Column="2" Style="{StaticResource IconButton}" Content="&#xE72C;" Margin="4,0,0,0" ToolTip="Refresh now" Click="OnRefresh" />
             </Grid>
 
-            <TextBlock x:Name="Empty" Style="{StaticResource Caption}" Margin="16,8,16,16" TextWrapping="Wrap" Visibility="Collapsed" />
-
-            <ItemsControl x:Name="Items" Margin="8,0,8,4" Focusable="False">
-                <ItemsControl.ItemTemplate>
-                    <DataTemplate>
-                        <Border Style="{StaticResource ClickableCard}" Padding="12,10" Margin="0,0,0,6" CornerRadius="6"
-                                MouseLeftButtonUp="OnItem" ToolTip="{Binding ResetTooltip}">
-                            <StackPanel>
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="Auto" />
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="Auto" />
-                                    </Grid.ColumnDefinitions>
-                                    <Ellipse Width="8" Height="8" Fill="{Binding ProviderBrush}" VerticalAlignment="Center" />
-                                    <TextBlock Grid.Column="1" Text="{Binding ShortTitle}" Style="{StaticResource BodyStrong}" FontSize="13" Margin="8,0,8,0" TextTrimming="CharacterEllipsis" />
-                                    <StackPanel Grid.Column="2" Orientation="Horizontal">
-                                        <TextBlock Text="{Binding LeftPercent}" Style="{StaticResource BodyStrong}" FontSize="13" />
-                                        <TextBlock Text=" left" Style="{StaticResource Caption}" VerticalAlignment="Bottom" />
-                                    </StackPanel>
-                                </Grid>
-                                <c:LimitBar Left="{Binding LeftFraction}" TimeLeft="{Binding TimeLeftFraction}" Status="{Binding Status}" Height="8" Margin="0,8,0,6" />
-                                <Grid>
-                                    <StackPanel Orientation="Horizontal">
-                                        <TextBlock Text="{Binding StatusGlyph}" Style="{StaticResource Glyph}" FontSize="11" Foreground="{Binding StatusBrush}" />
-                                        <TextBlock Text="{Binding PaceText}" Style="{StaticResource Caption}" Foreground="{Binding StatusBrush}" Margin="5,0,0,0" />
-                                    </StackPanel>
-                                    <TextBlock Text="{Binding ResetText}" Style="{StaticResource Caption}" HorizontalAlignment="Right" />
-                                </Grid>
-                            </StackPanel>
-                        </Border>
-                    </DataTemplate>
-                </ItemsControl.ItemTemplate>
-            </ItemsControl>
-
-            <!-- Footer -->
-            <Border BorderBrush="{DynamicResource DividerStrokeColorDefaultBrush}" BorderThickness="0,1,0,0" Padding="16,10">
+            <Border DockPanel.Dock="Bottom" BorderBrush="{DynamicResource DividerStrokeColorDefaultBrush}" BorderThickness="0,1,0,0" Padding="16,10">
                 <Grid>
                     <TextBlock x:Name="Updated" Style="{StaticResource Caption}" VerticalAlignment="Center" />
                     <Button Content="Open dashboard" Style="{DynamicResource AccentButtonStyle}" HorizontalAlignment="Right" Click="OnOpen" />
                 </Grid>
             </Border>
-        </StackPanel>
+
+            <TextBlock x:Name="Empty" DockPanel.Dock="Top" Style="{StaticResource Caption}" Margin="16,8,16,16" TextWrapping="Wrap" Visibility="Collapsed" />
+
+            <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Focusable="False">
+                <ItemsControl x:Name="Items" Margin="8,0,8,4" Focusable="False">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Border Style="{StaticResource ClickableCard}" Padding="12,9" Margin="0,0,0,6" CornerRadius="6"
+                                    MouseLeftButtonUp="OnItem" ToolTip="{Binding ResetTooltip}">
+                                <StackPanel>
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <Ellipse Width="8" Height="8" Fill="{Binding ProviderBrush}" VerticalAlignment="Center" />
+                                        <TextBlock Grid.Column="1" Text="{Binding ShortTitle}" Style="{StaticResource BodyStrong}" FontSize="13" Margin="8,0,8,0" TextTrimming="CharacterEllipsis" />
+                                        <StackPanel Grid.Column="2" Orientation="Horizontal">
+                                            <TextBlock Text="{Binding LeftPercent}" Style="{StaticResource BodyStrong}" FontSize="13" />
+                                            <TextBlock Text=" left" Style="{StaticResource Caption}" VerticalAlignment="Bottom" />
+                                        </StackPanel>
+                                    </Grid>
+                                    <c:LimitBar Left="{Binding LeftFraction}" TimeLeft="{Binding TimeLeftFraction}" Status="{Binding Status}" Height="8" Margin="0,8,0,6" />
+                                    <Grid>
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="{Binding StatusGlyph}" Style="{StaticResource Glyph}" FontSize="11" Foreground="{Binding StatusBrush}" />
+                                            <TextBlock Text="{Binding PaceText}" Style="{StaticResource Caption}" Foreground="{Binding StatusBrush}" Margin="5,0,0,0" />
+                                        </StackPanel>
+                                        <TextBlock Text="{Binding ResetText}" Style="{StaticResource Caption}" HorizontalAlignment="Right" />
+                                    </Grid>
+                                </StackPanel>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </ScrollViewer>
+        </DockPanel>
     </Border>
 </Window>

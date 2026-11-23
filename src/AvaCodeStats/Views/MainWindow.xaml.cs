@@ -28,6 +28,7 @@ public partial class MainWindow : Window
     {
         _host = host;
         InitializeComponent();
+        FitToScreen();
         SourceInitialized += (_, _) => ThemeService.ApplyTitleBar(this);
         _host.Changed += OnChanged;
         ThemeService.Changed += OnThemeChanged;
@@ -35,6 +36,29 @@ public partial class MainWindow : Window
         SyncProfile();
         UpdateIcon();
         NavLimits.IsChecked = true;
+    }
+
+    /// <summary>
+    /// Opens at the last size, or 1240×880, but never bigger than the work area (at 150% scaling a
+    /// 1080p screen is only 1280×~800 DIPs).
+    /// </summary>
+    private void FitToScreen()
+    {
+        var area = SystemParameters.WorkArea;
+        var s = _host.Settings;
+        MinWidth = Math.Min(MinWidth, area.Width);
+        MinHeight = Math.Min(MinHeight, area.Height);
+        Width = Math.Clamp(s.WindowWidth ?? 1240, MinWidth, area.Width * 0.95);
+        Height = Math.Clamp(s.WindowHeight ?? 880, MinHeight, area.Height * 0.95);
+        if (s.WindowMaximized) WindowState = WindowState.Maximized;
+        Closing += (_, _) =>
+        {
+            var bounds = WindowState == WindowState.Normal ? new Rect(Left, Top, Width, Height) : RestoreBounds;
+            s.WindowWidth = Math.Round(bounds.Width);
+            s.WindowHeight = Math.Round(bounds.Height);
+            s.WindowMaximized = WindowState == WindowState.Maximized;
+            s.Save();
+        };
     }
 
     internal void Navigate(string page)

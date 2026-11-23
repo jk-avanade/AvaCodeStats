@@ -28,6 +28,8 @@ public partial class SummaryPopup : Window
 
     internal void ShowNearTray()
     {
+        // A flyout, not a window: at most three quarters of the screen; the list scrolls beyond that.
+        MaxHeight = Math.Max(320, SystemParameters.WorkArea.Height * 0.75);
         Show();
         UpdateLayout();
         // Bottom-right of the work area (above the taskbar), like the Windows flyouts.

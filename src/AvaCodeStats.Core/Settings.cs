@@ -83,6 +83,11 @@ public sealed class AppSettings
 
     public bool NotifyWhenFarOverPace { get; set; } = true;
 
+    /// <summary>Last dashboard size (device-independent pixels) and state; null = fit to the screen.</summary>
+    public double? WindowWidth { get; set; }
+    public double? WindowHeight { get; set; }
+    public bool WindowMaximized { get; set; }
+
     /// <summary>Ask Codex's own usage endpoint for live limits (falls back to its logs).</summary>
     public bool CodexLiveUsage { get; set; } = true;
 
