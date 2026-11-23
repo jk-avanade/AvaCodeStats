@@ -70,6 +70,10 @@ internal sealed class AppHost : IDisposable
             Settings.Subscriptions = await ProviderFactory.DiscoverAsync(CancellationToken.None);
             if (Settings.Subscriptions.Count > 0) Settings.Save();
         }
+        else if (ProviderFactory.AddNewLocalTools(Settings.Subscriptions))
+        {
+            Settings.Save();
+        }
 
         var providers = new List<Core.Providers.IUsageProvider>();
         foreach (var s in Settings.Subscriptions.Where(s => s.Enabled))

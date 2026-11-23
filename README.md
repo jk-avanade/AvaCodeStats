@@ -19,6 +19,8 @@ A Windows tray app that tracks AI coding subscriptions, shows whether you are bu
 | GitHub Copilot | `api.github.com/copilot_internal/user`, the endpoint the Copilot extensions use for their own quota display. The token comes from the GitHub CLI (`gh auth token --user <login>`), so every `gh` account can be tracked. | – |
 | Claude (Claude Code) | `api.anthropic.com/api/oauth/usage`, the endpoint behind Claude Code's `/usage`, using the sign-in Claude Code keeps in `~/.claude/.credentials.json`. It's read-only: the app never refreshes the token, so Claude Code's own login is untouched. | `~/.claude/projects/**/*.jsonl` |
 | Codex | `chatgpt.com/backend-api/wham/usage` (Codex's own usage endpoint) with the ChatGPT sign-in Codex keeps in `~/.codex/auth.json`, read-only; falls back to the rate-limit windows in its session logs | `~/.codex/sessions`, `~/.codex/archived_sessions` |
+| Antigravity | The Antigravity CLI: `agy -p "/quota" --output-format json` (answers without starting an agent turn or spending quota). Weekly and 5-hour limits per model group (Gemini, Claude & GPT, Gemini Argon). Read at most every 10 minutes. | – |
+| Grok Bot | The weekly-usage cache the Grok Bot desktop app keeps in `%APPDATA%\Grok Bot\sand-client-persistence` (plain JSON; no credentials touched). As fresh as the app's last refresh, so open Grok Bot now and then. | – |
 
 Snapshots are stored in SQLite every 5 minutes: changes always, unchanged readings at most hourly. Log files are read incrementally and their token events are copied into the database, so history survives the tools cleaning up their own logs.
 
@@ -59,6 +61,8 @@ Claude model prices are built in. Other vendors' models have no default price, s
 Pace is measured in **days of allowance**: one day of allowance is the quota divided by the days in the period. "4.6 days over pace" means you have used what an even pace would only reach 4.6 days from now.
 
 ## Adding a subscription type
+
+Newly installed local tools (Claude Code, Codex, Antigravity CLI, Grok Bot) are added to the Personal profile on startup; move or switch them off in Settings.
 
 Implement `IUsageProvider` in `src/AvaCodeStats.Core/Providers/<Name>/`. It returns `UsageSnapshot`s (used, entitlement, period) and can write `TokenEvent`s to the `TokenStore`. Then register it in `ProviderFactory`. Everything else (pace, history, tray, dashboard, profiles) is provider-agnostic.
 

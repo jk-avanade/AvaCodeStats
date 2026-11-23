@@ -1,8 +1,10 @@
 using System.Windows.Media;
 using AvaCodeStats.Core;
+using AvaCodeStats.Core.Providers.Antigravity;
 using AvaCodeStats.Core.Providers.Claude;
 using AvaCodeStats.Core.Providers.Codex;
 using AvaCodeStats.Core.Providers.GitHubCopilot;
+using AvaCodeStats.Core.Providers.GrokBot;
 
 namespace AvaCodeStats.Theming;
 
@@ -27,6 +29,8 @@ internal sealed record Palette(
     Color Claude,
     Color Codex,
     Color Copilot,
+    Color Antigravity,
+    Color Grok,
     Color[] Series,
     Color[] TypeShades,
     Color? AccentFill = null,
@@ -49,6 +53,8 @@ internal sealed record Palette(
         ClaudeCodeProvider.Id => Claude,
         CodexProvider.Id => Codex,
         CopilotQuotaParser.ProviderId => Copilot,
+        AntigravityProvider.Id => Antigravity,
+        GrokBotProvider.Id => Grok,
         _ => Series[1],
     };
 
@@ -70,7 +76,7 @@ internal sealed record Palette(
         Track: C("#14000000"), Hatch: C("#2E000000"), Marker: C("#E4000000"),
         Text: C("#E4000000"), TextSecondary: C("#9E000000"), Grid: C("#14000000"),
         Hero: C("#E4000000"),
-        Claude: C("#C15F3C"), Codex: C("#3C4048"), Copilot: C("#6E5BD9"),
+        Claude: C("#C15F3C"), Codex: C("#3C4048"), Copilot: C("#6E5BD9"), Antigravity: C("#1A73E8"), Grok: C("#127A6A"),
         Series: Cs("#2A6DC8", "#C15F3C", "#6E5BD9", "#14A085", "#C98A00", "#0B8BB8", "#CE0569", "#5C5C5C"),
         TypeShades: Cs("#8A8F98", "#C9CDD3", "#5B6069", "#1F2329"));
 
@@ -80,7 +86,7 @@ internal sealed record Palette(
         Track: C("#17FFFFFF"), Hatch: C("#30FFFFFF"), Marker: C("#FFFFFFFF"),
         Text: C("#FFFFFFFF"), TextSecondary: C("#C5FFFFFF"), Grid: C("#14FFFFFF"),
         Hero: C("#FFFFFFFF"),
-        Claude: C("#E08A6A"), Codex: C("#D5D8DE"), Copilot: C("#A99CF5"),
+        Claude: C("#E08A6A"), Codex: C("#D5D8DE"), Copilot: C("#A99CF5"), Antigravity: C("#8AB4F8"), Grok: C("#5FD3BD"),
         Series: Cs("#60A5FA", "#E08A6A", "#A99CF5", "#4CC777", "#F2B33D", "#38BDF8", "#F472B6", "#9A9A9A"),
         TypeShades: Cs("#6B7079", "#3A3E45", "#A4AAB2", "#F2F3F5"));
 
@@ -92,7 +98,7 @@ internal sealed record Palette(
         Track: C("#14000000"), Hatch: C("#2E000000"), Marker: C("#E41C1C1C"),
         Text: C("#FF1C1C1C"), TextSecondary: C("#FF666666"), Grid: C("#FFE5E5E5"),
         Hero: C("#C24400"),
-        Claude: C("#FF5800"), Codex: C("#2A6DC8"), Copilot: C("#6250D6"),
+        Claude: C("#FF5800"), Codex: C("#2A6DC8"), Copilot: C("#6250D6"), Antigravity: C("#0B8BB8"), Grok: C("#14A085"),
         Series: Cs("#FF5800", "#2A6DC8", "#CE0569", "#C98A00", "#14A085", "#6250D6", "#C80000", "#0B8BB8"),
         TypeShades: Cs("#FF9A63", "#FFE4D6", "#C24400", "#7A2B00"),
         AccentFill: C("#C24400"), AccentText: C("#A83B00"), TextOnAccent: C("#FFFFFF"),
@@ -104,7 +110,7 @@ internal sealed record Palette(
         Track: C("#17FFFFFF"), Hatch: C("#30FFFFFF"), Marker: C("#FFFFFFFF"),
         Text: C("#FFFFFFFF"), TextSecondary: C("#C5FFFFFF"), Grid: C("#14FFFFFF"),
         Hero: C("#FF7A33"),
-        Claude: C("#F05000"), Codex: C("#3D84E0"), Copilot: C("#8F84EA"),
+        Claude: C("#F05000"), Codex: C("#3D84E0"), Copilot: C("#8F84EA"), Antigravity: C("#1E92BF"), Grok: C("#14A085"),
         Series: Cs("#F05000", "#3D84E0", "#D9348A", "#B88000", "#14A085", "#8F84EA", "#E34948", "#1E92BF"),
         TypeShades: Cs("#FF9A63", "#4C2A1A", "#FFC2A1", "#FF5800"),
         AccentFill: C("#FF9A63"), AccentText: C("#FFC2A1"), TextOnAccent: C("#000000"),

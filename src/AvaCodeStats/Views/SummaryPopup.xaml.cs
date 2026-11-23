@@ -46,14 +46,20 @@ public partial class SummaryPopup : Window
         (s.TrayProfile switch { Profiles.Personal => Personal, Profiles.Unified => All, _ => Work }).IsChecked = true;
         _syncing = false;
 
-        var items = LimitItem.For(_host, s.TrayProfile)
+        var all = LimitItem.For(_host, s.TrayProfile);
+        // Short windows nobody has touched (e.g. idle 5-hour limits) only add noise here.
+        bool Idle(LimitItem i) => i.Snapshot.Used <= 0 && i.Snapshot.PeriodEndUtc - i.Snapshot.PeriodStartUtc < TimeSpan.FromDays(1);
+        var hidden = all.Count(Idle);
+        var items = all.Where(i => !Idle(i))
             .OrderByDescending(i => AlertRules.Severity(i.Status))
             .ThenByDescending(i => i.Snapshot.UsedFraction)
             .ToList();
         Items.ItemsSource = items;
         Empty.Visibility = items.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+        Updated.ToolTip = hidden > 0 ? "5-hour windows at 0% are hidden here; the Limits page shows everything." : null;
         Empty.Text = $"No limits in the {Profiles.Label(s.TrayProfile)} profile yet.";
-        Updated.Text = _host.Collector.LastCollectedUtc is { } t ? $"Updated {t.ToLocalTime():HH:mm}" : "Refreshing…";
+        Updated.Text = (_host.Collector.LastCollectedUtc is { } t ? $"Updated {t.ToLocalTime():HH:mm}" : "Refreshing…")
+                       + (hidden > 0 ? $"  ·  {hidden} idle short limit{(hidden == 1 ? "" : "s")} hidden" : "");
 
         // Keep the bottom edge anchored when the height changes.
         if (IsVisible)

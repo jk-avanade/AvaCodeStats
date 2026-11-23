@@ -1,7 +1,9 @@
 using AvaCodeStats.Core.Providers;
+using AvaCodeStats.Core.Providers.Antigravity;
 using AvaCodeStats.Core.Providers.Claude;
 using AvaCodeStats.Core.Providers.Codex;
 using AvaCodeStats.Core.Providers.GitHubCopilot;
+using AvaCodeStats.Core.Providers.GrokBot;
 using AvaCodeStats.Core.Tokens;
 
 namespace AvaCodeStats.Core;
@@ -16,6 +18,8 @@ public static class ProviderFactory
         [CopilotQuotaParser.ProviderId] = "GitHub Copilot",
         [ClaudeCodeProvider.Id] = "Claude",
         [CodexProvider.Id] = "Codex",
+        [AntigravityProvider.Id] = "Antigravity",
+        [GrokBotProvider.Id] = "Grok Bot",
     };
 
     public static string DisplayName(string providerId) => DisplayNames.GetValueOrDefault(providerId, providerId);
@@ -28,6 +32,8 @@ public static class ProviderFactory
         },
         ClaudeCodeProvider.Id => new ClaudeCodeProvider(config.Account, Home(config, ClaudeCodeProvider.DefaultHome), tokens, Http),
         CodexProvider.Id => new CodexProvider(config.Account, Home(config, CodexProvider.DefaultHome), tokens, Http, codexLive),
+        AntigravityProvider.Id => new AntigravityProvider(config.Account, config.Path),
+        GrokBotProvider.Id => new GrokBotProvider(config.Account, config.Path),
         _ => throw new NotSupportedException($"Unknown provider '{config.Provider}'."),
     };
 
@@ -45,11 +51,37 @@ public static class ProviderFactory
         }
         catch (Exception e) when (e is InvalidOperationException or System.ComponentModel.Win32Exception) { }
 
-        if (Directory.Exists(ClaudeCodeProvider.DefaultHome))
-            found.Add(new SubscriptionConfig { Provider = ClaudeCodeProvider.Id, Account = "default" });
-        if (Directory.Exists(CodexProvider.DefaultHome))
-            found.Add(new SubscriptionConfig { Provider = CodexProvider.Id, Account = "default" });
+        found.AddRange(LocalTools());
         return found;
+    }
+
+    /// <summary>Locally installed tools that need no account setup.</summary>
+    private static IEnumerable<SubscriptionConfig> LocalTools()
+    {
+        if (Directory.Exists(ClaudeCodeProvider.DefaultHome))
+            yield return new SubscriptionConfig { Provider = ClaudeCodeProvider.Id, Account = "default" };
+        if (Directory.Exists(CodexProvider.DefaultHome))
+            yield return new SubscriptionConfig { Provider = CodexProvider.Id, Account = "default" };
+        if (AntigravityProvider.FindCli() is not null)
+            yield return new SubscriptionConfig { Provider = AntigravityProvider.Id, Account = "default" };
+        if (Directory.Exists(GrokBotProvider.DefaultDataDir))
+            yield return new SubscriptionConfig { Provider = GrokBotProvider.Id, Account = "default" };
+    }
+
+    /// <summary>
+    /// Adds local tools installed since the settings were written (as personal). A tool the user
+    /// switched off stays in the list disabled, so it is never re-added.
+    /// </summary>
+    public static bool AddNewLocalTools(List<SubscriptionConfig> subscriptions)
+    {
+        var added = false;
+        foreach (var tool in LocalTools())
+        {
+            if (subscriptions.Any(s => s.Provider == tool.Provider)) continue;
+            subscriptions.Add(tool);
+            added = true;
+        }
+        return added;
     }
 
     private static string Home(SubscriptionConfig c, string fallback) =>

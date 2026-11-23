@@ -58,7 +58,9 @@ public sealed class UsageStore
         if (last is not null
             && last.Used.Equals(s.Used)
             && last.Entitlement.Equals(s.Entitlement)
-            && last.PeriodStartUtc == s.PeriodStartUtc
+            // An unused rolling window (Antigravity) reports "reset = now + window" on every read;
+            // consecutive 0% readings are the same reading even though the period moved.
+            && (last.PeriodStartUtc == s.PeriodStartUtc || (last.Used == 0 && s.Used == 0))
             && s.TimestampUtc - last.TimestampUtc < HeartbeatInterval)
         {
             return false;
