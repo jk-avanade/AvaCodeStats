@@ -12,6 +12,20 @@ A Windows tray app that tracks AI coding subscriptions, shows whether you are bu
   - **Settings**: theme and brand, tray profile and quota, alert levels, which profile each subscription belongs to, polling interval.
 - **Profiles**: Work, Personal, or All. The dashboard and the tray each have their own (switch at the top of the dashboard, in the popup, or in the tray menu).
 
+## Screenshots
+
+| Limits: every quota, grouped by subscription | Tray popup |
+|---|---|
+| <img src="docs/screenshots/limits.png" alt="Limits page" width="620"> | <img src="docs/screenshots/popup.png" alt="Tray summary popup" width="250"> |
+
+| Burn: one quota against an even pace | Cost: API-price estimate from local session logs |
+|---|---|
+| <img src="docs/screenshots/burn.png" alt="Burn page" width="440"> | <img src="docs/screenshots/cost.png" alt="Cost page" width="440"> |
+| **Tokens** | **Settings** |
+| <img src="docs/screenshots/tokens.png" alt="Tokens page" width="440"> | <img src="docs/screenshots/settings.png" alt="Settings page" width="440"> |
+
+Click a subscription's header to fold it to its most pressing quota (worst pace, then least left, then soonest reset), as Antigravity is in the popup above.
+
 ## What it reads
 
 | Provider | Limits | Tokens / cost |
@@ -72,7 +86,10 @@ Implement `IUsageProvider` in `src/AvaCodeStats.Core/Providers/<Name>/`. It retu
 dotnet test
 dotnet run --project src/AvaCodeStats -- --open limits   # also: burn | cost | tokens
 ./scripts/install.ps1                                    # publishes to %LOCALAPPDATA%\Programs\AvaCodeStats and starts it
+dotnet run --project src/AvaCodeStats -- --screenshots docs/screenshots   # regenerates the README screenshots
 ```
+
+`--screenshots` renders every page and the popup from your recorded data and exits. Account logins show as `work-account` / `personal-account`, nothing is polled and settings are not saved, so it can run next to the tray instance.
 
 Then use **Start with Windows** in the tray menu.
 

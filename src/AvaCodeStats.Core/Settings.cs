@@ -69,6 +69,12 @@ public sealed class AppSettings
     /// <summary>Quota shown in the tray per profile, "provider:account:metric". Missing = the one most over pace.</summary>
     public Dictionary<string, string> TrayKeys { get; set; } = [];
 
+    /// <summary>Subscriptions ("provider:account") folded to their most pressing quota on the Limits page.</summary>
+    public List<string> CollapsedGroups { get; set; } = [];
+
+    /// <summary>The same for the tray summary popup, which is folded separately.</summary>
+    public List<string> CollapsedTrayGroups { get; set; } = [];
+
     /// <summary>Extra or replacement model prices (USD per million tokens) for the cost estimate.</summary>
     public List<ModelPrice> Pricing { get; set; } = [];
 
@@ -138,8 +144,13 @@ public sealed class AppSettings
         return new AppSettings();
     }
 
+    /// <summary>Edits stay in memory and <see cref="Save"/> does nothing (screenshot mode).</summary>
+    [JsonIgnore]
+    public bool ReadOnly { get; set; }
+
     public void Save()
     {
+        if (ReadOnly) return;
         Directory.CreateDirectory(DataDirectory);
         File.WriteAllText(SettingsPath, JsonSerializer.Serialize(this, Json));
     }

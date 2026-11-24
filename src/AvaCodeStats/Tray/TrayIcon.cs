@@ -122,7 +122,7 @@ internal sealed class TrayIcon : IDisposable
                      .OrderBy(x => x.ProviderId).ThenBy(x => x.AccountId).ThenBy(x => x.MetricName))
         {
             var key = snap.Key.ToString();
-            var account = snap.AccountId == "default" ? "" : $" ({snap.AccountId})";
+            var account = snap.AccountId == "default" ? "" : $" ({Privacy.Account(s, snap.ProviderId, snap.AccountId)})";
             quota.Items.Add(new MenuItem
             {
                 Header = $"{ProviderFactory.DisplayName(snap.ProviderId)} · {snap.MetricName}{account}",

@@ -22,6 +22,8 @@ internal static class Fmt
 /// <summary>Segoe Fluent Icons code points used in the UI.</summary>
 internal static class Glyphs
 {
+    public const string ChevronDown = "";
+    public const string ChevronRight = "";
     public const string Gauge = "";      // Speedometer
     public const string Chart = "";      // AreaChart
     public const string Money = "";      // PaymentCard

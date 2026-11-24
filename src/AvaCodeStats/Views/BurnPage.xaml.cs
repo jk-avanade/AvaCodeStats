@@ -28,11 +28,13 @@ public partial class BurnPage : UserControl, IPage
         Refresh();
     }
 
-    private sealed record Choice(UsageSnapshot Snapshot)
+    private sealed record Choice(UsageSnapshot Snapshot, string Label)
     {
-        public override string ToString() =>
-            $"{ProviderFactory.DisplayName(Snapshot.ProviderId)} · {Snapshot.MetricName}" + (Snapshot.AccountId == "default" ? "" : $"  ({Snapshot.AccountId})");
+        public override string ToString() => Label;
     }
+
+    private Choice ChoiceFor(UsageSnapshot x) => new(x,
+        $"{ProviderFactory.DisplayName(x.ProviderId)} · {x.MetricName}" + Privacy.Suffix(_host.Settings, x.ProviderId, x.AccountId, "  (") + (x.AccountId == "default" ? "" : ")"));
 
     private sealed record Kpi(string Label, string Value, string Note, Brush Brush);
 
@@ -44,7 +46,7 @@ public partial class BurnPage : UserControl, IPage
             x => s.InActiveProfile(x.ProviderId, x.AccountId), s.Thresholds)?.Key;
 
         _filling = true;
-        Picker.ItemsSource = items.Select(i => new Choice(i.Snapshot)).ToList();
+        Picker.ItemsSource = items.Select(i => ChoiceFor(i.Snapshot)).ToList();
         var index = items.ToList().FindIndex(i => i.Key == _selected);
         Picker.SelectedIndex = items.Count == 0 ? -1 : Math.Max(0, index);
         _filling = false;
@@ -101,7 +103,7 @@ public partial class BurnPage : UserControl, IPage
         var start = snap.PeriodStartUtc.ToLocalTime();
         var end = snap.PeriodEndUtc.ToLocalTime();
         Period.Text = $"Period {start:ddd d MMM HH:mm} – {end:ddd d MMM HH:mm}";
-        Plan.Text = string.Join("  ·  ", new[] { snap.AccountId == "default" ? null : snap.AccountId, snap.PlanName }.Where(x => x is not null));
+        Plan.Text = string.Join("  ·  ", new[] { snap.AccountId == "default" ? null : Privacy.Account(_host.Settings, snap.ProviderId, snap.AccountId), snap.PlanName }.Where(x => x is not null));
 
         var shortWindow = (snap.PeriodEndUtc - snap.PeriodStartUtc).TotalDays < 1.5;
         Brush? Warn(bool b) => b ? (Brush)FindResource("StatusWarnBrush") : null;

@@ -32,6 +32,12 @@ public sealed class UsageCollector(UsageStore store, TokenStore tokens)
             _latest[s.Key] = s;
     }
 
+    /// <summary>Treats the newest recorded reading as the last collection (screenshot mode, which does not poll).</summary>
+    public void UseHistoryAsLastCollection()
+    {
+        if (_latest.Count > 0) LastCollectedUtc = _latest.Values.Max(s => s.TimestampUtc);
+    }
+
     public async Task CollectAsync(CancellationToken ct = default)
     {
         if (!await _gate.WaitAsync(0, ct)) return; // a poll is already running

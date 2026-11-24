@@ -67,6 +67,60 @@
         </Style.Triggers>
     </Style>
 
+    <!-- One quota row inside a group card (Card with small padding). -->
+    <Style x:Key="ClickableRow" TargetType="Border">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="CornerRadius" Value="5" />
+        <Setter Property="Cursor" Value="Hand" />
+        <Style.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+                <Setter Property="Background" Value="{DynamicResource SubtleFillColorSecondaryBrush}" />
+            </Trigger>
+        </Style.Triggers>
+    </Style>
+    <!-- Hairline between rows of a group card; hidden above the first row (LimitItem.IsFirst). -->
+    <Style x:Key="RowDivider" TargetType="Rectangle">
+        <Setter Property="Height" Value="1" />
+        <Setter Property="Fill" Value="{DynamicResource DividerStrokeColorDefaultBrush}" />
+        <Style.Triggers>
+            <DataTrigger Binding="{Binding IsFirst}" Value="True">
+                <Setter Property="Visibility" Value="Collapsed" />
+            </DataTrigger>
+        </Style.Triggers>
+    </Style>
+
+    <!-- Header of a group card (LimitGroup): folds the card when it has more than one quota. -->
+    <Style x:Key="GroupHeader" TargetType="Border">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="CornerRadius" Value="5" />
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="ToolTip" Value="{Binding ToggleTip}" />
+        <Style.Triggers>
+            <DataTrigger Binding="{Binding CanCollapse}" Value="False">
+                <Setter Property="Cursor" Value="Arrow" />
+                <Setter Property="ToolTip" Value="{x:Null}" />
+            </DataTrigger>
+            <MultiDataTrigger>
+                <MultiDataTrigger.Conditions>
+                    <Condition Binding="{Binding IsMouseOver, RelativeSource={RelativeSource Self}}" Value="True" />
+                    <Condition Binding="{Binding CanCollapse}" Value="True" />
+                </MultiDataTrigger.Conditions>
+                <Setter Property="Background" Value="{DynamicResource SubtleFillColorSecondaryBrush}" />
+            </MultiDataTrigger>
+        </Style.Triggers>
+    </Style>
+    <Style x:Key="GroupChevron" TargetType="TextBlock" BasedOn="{StaticResource Glyph}">
+        <Setter Property="Text" Value="{Binding Chevron}" />
+        <Setter Property="FontSize" Value="10" />
+        <Setter Property="Width" Value="12" />
+        <Setter Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}" />
+        <Style.Triggers>
+            <DataTrigger Binding="{Binding CanCollapse}" Value="False">
+                <Setter Property="Visibility" Value="Hidden" />
+            </DataTrigger>
+        </Style.Triggers>
+    </Style>
+
     <!-- Segmented control: RadioButtons in a SegmentedHost. -->
     <Style x:Key="SegmentedHost" TargetType="Border">
         <Setter Property="Background" Value="{DynamicResource ControlFillColorDefaultBrush}" />

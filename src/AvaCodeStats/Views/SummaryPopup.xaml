@@ -29,44 +29,80 @@
             </Grid>
 
             <Border DockPanel.Dock="Bottom" BorderBrush="{DynamicResource DividerStrokeColorDefaultBrush}" BorderThickness="0,1,0,0" Padding="16,10">
-                <Grid>
-                    <TextBlock x:Name="Updated" Style="{StaticResource Caption}" VerticalAlignment="Center" />
-                    <Button Content="Open dashboard" Style="{DynamicResource AccentButtonStyle}" HorizontalAlignment="Right" Click="OnOpen" />
-                </Grid>
+                <DockPanel>
+                    <Button DockPanel.Dock="Right" Content="Open dashboard" Style="{DynamicResource AccentButtonStyle}" Margin="12,0,0,0" Click="OnOpen" />
+                    <TextBlock x:Name="Updated" Style="{StaticResource Caption}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                </DockPanel>
             </Border>
 
             <TextBlock x:Name="Empty" DockPanel.Dock="Top" Style="{StaticResource Caption}" Margin="16,8,16,16" TextWrapping="Wrap" Visibility="Collapsed" />
 
             <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Focusable="False">
-                <ItemsControl x:Name="Items" Margin="8,0,8,4" Focusable="False">
+                <!-- One card per subscription; one compact row per quota. Shared sizes keep the bars aligned across cards. -->
+                <ItemsControl x:Name="Groups" Margin="8,0,8,4" Focusable="False" Grid.IsSharedSizeScope="True">
                     <ItemsControl.ItemTemplate>
                         <DataTemplate>
-                            <Border Style="{StaticResource ClickableCard}" Padding="12,9" Margin="0,0,0,6" CornerRadius="6"
-                                    MouseLeftButtonUp="OnItem" ToolTip="{Binding ResetTooltip}">
-                                <StackPanel>
+                            <StackPanel Margin="0,4,0,6">
+                                <Border Style="{StaticResource GroupHeader}" Margin="0,0,0,3" Padding="4,3,6,3" MouseLeftButtonUp="OnGroupClick">
+                                    <!-- The name wins over the plan: the plan trims first. -->
                                     <Grid>
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="Auto" />
-                                            <ColumnDefinition Width="*" />
                                             <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
                                         </Grid.ColumnDefinitions>
-                                        <Ellipse Width="8" Height="8" Fill="{Binding ProviderBrush}" VerticalAlignment="Center" />
-                                        <TextBlock Grid.Column="1" Text="{Binding ShortTitle}" Style="{StaticResource BodyStrong}" FontSize="13" Margin="8,0,8,0" TextTrimming="CharacterEllipsis" />
-                                        <StackPanel Grid.Column="2" Orientation="Horizontal">
-                                            <TextBlock Text="{Binding LeftPercent}" Style="{StaticResource BodyStrong}" FontSize="13" />
-                                            <TextBlock Text=" left" Style="{StaticResource Caption}" VerticalAlignment="Bottom" />
-                                        </StackPanel>
+                                        <TextBlock Style="{StaticResource GroupChevron}" FontSize="9" Margin="0,0,4,0" />
+                                        <Ellipse Grid.Column="1" Width="8" Height="8" Fill="{Binding Dot}" VerticalAlignment="Center" />
+                                        <TextBlock Grid.Column="2" Text="{Binding Name}" Style="{StaticResource BodyStrong}" FontSize="13" Margin="8,0,0,0" VerticalAlignment="Center" />
+                                        <TextBlock Grid.Column="3" Text="{Binding HiddenText}" Style="{StaticResource Caption}" Margin="8,0,0,0" VerticalAlignment="Center" />
+                                        <TextBlock Grid.Column="4" Text="{Binding Meta}" ToolTip="{Binding Meta}" Style="{StaticResource Caption}" Margin="12,0,0,0"
+                                                   HorizontalAlignment="Right" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
                                     </Grid>
-                                    <c:LimitBar Left="{Binding LeftFraction}" TimeLeft="{Binding TimeLeftFraction}" Status="{Binding Status}" Height="8" Margin="0,8,0,6" />
-                                    <Grid>
-                                        <StackPanel Orientation="Horizontal">
-                                            <TextBlock Text="{Binding StatusGlyph}" Style="{StaticResource Glyph}" FontSize="11" Foreground="{Binding StatusBrush}" />
-                                            <TextBlock Text="{Binding PaceText}" Style="{StaticResource Caption}" Foreground="{Binding StatusBrush}" Margin="5,0,0,0" />
-                                        </StackPanel>
-                                        <TextBlock Text="{Binding ResetText}" Style="{StaticResource Caption}" HorizontalAlignment="Right" />
-                                    </Grid>
-                                </StackPanel>
-                            </Border>
+                                </Border>
+                                <Border Style="{StaticResource Card}" Padding="3" CornerRadius="6">
+                                    <ItemsControl ItemsSource="{Binding Rows}" Focusable="False">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <StackPanel>
+                                                    <Rectangle Style="{StaticResource RowDivider}" Margin="8,1" />
+                                                    <Border Style="{StaticResource ClickableRow}" Padding="9,6" CornerRadius="4"
+                                                            MouseLeftButtonUp="OnItem" ToolTip="{Binding ResetTooltip}">
+                                                        <Grid>
+                                                            <Grid.ColumnDefinitions>
+                                                                <ColumnDefinition Width="Auto" SharedSizeGroup="Title" />
+                                                                <ColumnDefinition Width="*" />
+                                                                <ColumnDefinition Width="Auto" SharedSizeGroup="Left" />
+                                                            </Grid.ColumnDefinitions>
+                                                            <Grid.RowDefinitions>
+                                                                <RowDefinition Height="Auto" />
+                                                                <RowDefinition Height="Auto" />
+                                                            </Grid.RowDefinitions>
+                                                            <TextBlock Text="{Binding Title}" Style="{StaticResource BodyStrong}" FontSize="13" MaxWidth="160"
+                                                                       TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                                                            <c:LimitBar Grid.Column="1" Left="{Binding LeftFraction}" TimeLeft="{Binding TimeLeftFraction}" Status="{Binding Status}"
+                                                                        Height="8" Margin="12,0,12,0" VerticalAlignment="Center" />
+                                                            <!-- Runs share a baseline; right-aligned so "left" lines up whatever the number's width. -->
+                                                            <TextBlock Grid.Column="2" HorizontalAlignment="Right" VerticalAlignment="Center">
+                                                                <Run Text="{Binding LeftPercent, Mode=OneWay}" FontSize="13" FontWeight="SemiBold" Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
+                                                                <Run Text="left" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                                                            </TextBlock>
+                                                            <Grid Grid.Row="1" Grid.ColumnSpan="3" Margin="0,3,0,0">
+                                                                <StackPanel Orientation="Horizontal">
+                                                                    <TextBlock Text="{Binding StatusGlyph}" Style="{StaticResource Glyph}" FontSize="10" Foreground="{Binding StatusBrush}" />
+                                                                    <TextBlock Text="{Binding PaceText}" Style="{StaticResource Caption}" Foreground="{Binding StatusBrush}" Margin="5,0,0,0" />
+                                                                </StackPanel>
+                                                                <TextBlock Text="{Binding ResetText}" Style="{StaticResource Caption}" HorizontalAlignment="Right" />
+                                                            </Grid>
+                                                        </Grid>
+                                                    </Border>
+                                                </StackPanel>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </Border>
+                            </StackPanel>
                         </DataTemplate>
                     </ItemsControl.ItemTemplate>
                 </ItemsControl>

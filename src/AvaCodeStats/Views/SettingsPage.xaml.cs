@@ -29,8 +29,8 @@ public partial class SettingsPage : UserControl, IPage
     /// <summary>Editable view of one subscription; edits save immediately.</summary>
     private sealed class SubscriptionRow(SubscriptionConfig config, AppHost host)
     {
-        public string Name => ProviderFactory.DisplayName(config.Provider) + (config.Account == "default" ? "" : $" · {config.Account}");
-        public string Source => config.Provider + ":" + config.Account;
+        public string Name => ProviderFactory.DisplayName(config.Provider) + Privacy.Suffix(host.Settings, config.Provider, config.Account);
+        public string Source => config.Provider + ":" + Privacy.Account(host.Settings, config.Provider, config.Account);
         public Brush Dot => ThemeService.Brush(ThemeService.Current.ForProvider(config.Provider));
         public string[] ProfileChoices { get; } = ["Work", "Personal"];
 
@@ -61,7 +61,7 @@ public partial class SettingsPage : UserControl, IPage
         quotas.AddRange(_host.Collector.Latest.Values
             .Where(x => !x.Unlimited && x.Entitlement > 0 && s.InProfile(s.TrayProfile, x.ProviderId, x.AccountId))
             .OrderBy(x => x.ProviderId).ThenBy(x => x.AccountId).ThenBy(x => x.MetricName)
-            .Select(x => new Choice($"{ProviderFactory.DisplayName(x.ProviderId)} · {x.MetricName}" + (x.AccountId == "default" ? "" : $" ({x.AccountId})"), x.Key.ToString())));
+            .Select(x => new Choice($"{ProviderFactory.DisplayName(x.ProviderId)} · {x.MetricName}" + (x.AccountId == "default" ? "" : $" ({Privacy.Account(s, x.ProviderId, x.AccountId)})"), x.Key.ToString())));
         TrayQuota.ItemsSource = quotas;
         var chosen = s.TrayKeys.GetValueOrDefault(s.TrayProfile) ?? "";
         TrayQuota.SelectedItem = quotas.FirstOrDefault(q => (string)q.Value == chosen) ?? quotas[0];

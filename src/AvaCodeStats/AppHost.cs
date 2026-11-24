@@ -45,7 +45,21 @@ internal sealed class AppHost : IDisposable
         _ = ApplySettingsAsync();
     }
 
-    public Task RefreshAsync() => Collector.CollectAsync();
+    /// <summary>Screenshot mode: theme only. No tray, no polling, and settings are never written.</summary>
+    public void StartReadOnly()
+    {
+        ReadOnly = true;
+        Settings.ReadOnly = true;
+        ThemeService.Initialise(Settings);
+    }
+
+    /// <summary>Settings edits stay in memory (screenshot mode).</summary>
+    public bool ReadOnly { get; private set; }
+
+    internal MainWindow? Dashboard => _main;
+    internal SummaryPopup? Summary => _summary;
+
+    public Task RefreshAsync() => ReadOnly ? Task.CompletedTask : Collector.CollectAsync();
 
     /// <summary>Saves settings and updates everything that depends on them.</summary>
     public void SaveSettings(bool providersChanged = false, bool themeChanged = false)

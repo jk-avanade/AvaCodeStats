@@ -15,9 +15,8 @@ internal sealed class LimitItem(UsageSnapshot snapshot, PaceInfo pace, DateTimeO
 
     public string Provider => ProviderFactory.DisplayName(Snapshot.ProviderId);
     public string Title => Snapshot.MetricName;
-    /// <summary>Set when the list holds several accounts of this provider, so rows can be told apart.</summary>
-    public bool ShowAccount { get; set; }
-    public string ShortTitle => $"{Provider} · {Snapshot.MetricName}" + (ShowAccount ? $" ({Snapshot.AccountId})" : "");
+    /// <summary>First row of its group's card: no divider above it.</summary>
+    public bool IsFirst { get; set; }
     public double LeftFraction => 1 - Math.Clamp(Snapshot.UsedFraction, 0, 1);
     public double TimeLeftFraction => 1 - Pace.ElapsedFraction;
     public string LeftPercent => $"{LeftFraction * 100:0}%";
@@ -54,27 +53,59 @@ internal sealed class LimitItem(UsageSnapshot snapshot, PaceInfo pace, DateTimeO
             .OrderBy(x => x.ProviderId).ThenBy(x => x.AccountId)
             .ThenBy(x => x.PeriodEndUtc - x.PeriodStartUtc).ThenBy(x => x.MetricName)
             .Select(x => new LimitItem(x, PaceCalculator.Calculate(x, now, s.Thresholds), now))
-            .ToList()
-            .With(list =>
-            {
-                var multi = list.GroupBy(i => i.Snapshot.ProviderId).Where(g => g.Select(i => i.Snapshot.AccountId).Distinct().Count() > 1)
-                    .Select(g => g.Key).ToHashSet();
-                foreach (var i in list) i.ShowAccount = multi.Contains(i.Snapshot.ProviderId);
-            });
+            .ToList();
     }
 }
 
-/// <summary>Quotas of one provider account.</summary>
-internal sealed class LimitGroup(string providerId, string account, string? plan, string? profile, IReadOnlyList<LimitItem> items)
+/// <summary>
+/// Quotas of one provider account, shown as one card. Groups and rows keep the order of the items given.
+/// Folded, the card shows only the most pressing quota: worst pace, then least left, then soonest reset.
+/// </summary>
+internal sealed class LimitGroup
 {
-    public string Name { get; } = ProviderFactory.DisplayName(providerId) + (account == "default" ? "" : $" · {account}");
-    public string Meta { get; } = string.Join("  ·  ", new[] { plan, profile }.Where(x => !string.IsNullOrEmpty(x)));
-    public Brush Dot { get; } = ThemeService.Brush(ThemeService.Current.ForProvider(providerId));
-    public IReadOnlyList<LimitItem> Items { get; } = items;
+    private LimitGroup(AppSettings settings, string providerId, string account, string? plan, string? profile, IReadOnlyList<LimitItem> items, bool collapsed)
+    {
+        Key = $"{providerId}:{account}";
+        Name = ProviderFactory.DisplayName(providerId) + Privacy.Suffix(settings, providerId, account);
+        Meta = string.Join("  ·  ", new[] { plan, profile }.Where(x => !string.IsNullOrEmpty(x)));
+        Dot = ThemeService.Brush(ThemeService.Current.ForProvider(providerId));
+        Items = items;
+        CanCollapse = items.Count > 1;
+        IsCollapsed = collapsed && CanCollapse;
+        Rows = IsCollapsed ? [Worst(items)] : items;
+        for (var i = 0; i < Rows.Count; i++) Rows[i].IsFirst = i == 0;
+    }
 
-    public static IReadOnlyList<LimitGroup> From(IEnumerable<LimitItem> items, AppSettings settings, bool showProfile) =>
+    /// <summary>"provider:account", as stored in the collapsed-group settings.</summary>
+    public string Key { get; }
+    public string Name { get; }
+    public string Meta { get; }
+    public Brush Dot { get; }
+    public IReadOnlyList<LimitItem> Items { get; }
+    /// <summary>What the card shows: every quota, or only the most pressing one when folded.</summary>
+    public IReadOnlyList<LimitItem> Rows { get; }
+    public bool CanCollapse { get; }
+    public bool IsCollapsed { get; }
+    public string Chevron => IsCollapsed ? Glyphs.ChevronRight : Glyphs.ChevronDown;
+    public string ToggleTip => IsCollapsed ? $"Show all {Items.Count} limits" : "Show only the most pressing limit";
+    public string HiddenText => IsCollapsed ? $"+{Items.Count - 1} more" : "";
+
+    private static LimitItem Worst(IEnumerable<LimitItem> items) => items
+        .OrderByDescending(i => AlertRules.Severity(i.Status))
+        .ThenBy(i => i.LeftFraction)
+        .ThenBy(i => i.Snapshot.PeriodEndUtc)
+        .First();
+
+    public static IReadOnlyList<LimitGroup> From(IEnumerable<LimitItem> items, AppSettings settings, bool showProfile, ICollection<string> collapsed) =>
         items.GroupBy(i => (i.Snapshot.ProviderId, i.Snapshot.AccountId))
-            .Select(g => new LimitGroup(g.Key.ProviderId, g.Key.AccountId, g.First().Snapshot.PlanName,
-                showProfile ? Profiles.Label(settings.ProfileOf(g.Key.ProviderId, g.Key.AccountId)) : null, g.ToList()))
+            .Select(g => new LimitGroup(settings, g.Key.ProviderId, g.Key.AccountId, g.First().Snapshot.PlanName,
+                showProfile ? Profiles.Label(settings.ProfileOf(g.Key.ProviderId, g.Key.AccountId)) : null, g.ToList(),
+                collapsed.Contains($"{g.Key.ProviderId}:{g.Key.AccountId}")))
             .ToList();
+
+    /// <summary>Folds or unfolds the group in <paramref name="collapsed"/> (a settings list).</summary>
+    public void Toggle(List<string> collapsed)
+    {
+        if (!collapsed.Remove(Key)) collapsed.Add(Key);
+    }
 }

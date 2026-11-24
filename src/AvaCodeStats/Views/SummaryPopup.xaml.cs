@@ -50,16 +50,17 @@ public partial class SummaryPopup : Window
         // Short windows nobody has touched (e.g. idle 5-hour limits) only add noise here.
         bool Idle(LimitItem i) => i.Snapshot.Used <= 0 && i.Snapshot.PeriodEndUtc - i.Snapshot.PeriodStartUtc < TimeSpan.FromDays(1);
         var hidden = all.Count(Idle);
+        // Worst first; grouping keeps that order, so the subscription with the worst quota comes first.
         var items = all.Where(i => !Idle(i))
             .OrderByDescending(i => AlertRules.Severity(i.Status))
             .ThenByDescending(i => i.Snapshot.UsedFraction)
             .ToList();
-        Items.ItemsSource = items;
+        Groups.ItemsSource = LimitGroup.From(items, s, s.TrayProfile == Profiles.Unified, s.CollapsedTrayGroups);
         Empty.Visibility = items.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
         Updated.ToolTip = hidden > 0 ? "5-hour windows at 0% are hidden here; the Limits page shows everything." : null;
         Empty.Text = $"No limits in the {Profiles.Label(s.TrayProfile)} profile yet.";
         Updated.Text = (_host.Collector.LastCollectedUtc is { } t ? $"Updated {t.ToLocalTime():HH:mm}" : "Refreshing…")
-                       + (hidden > 0 ? $"  ·  {hidden} idle short limit{(hidden == 1 ? "" : "s")} hidden" : "");
+                       + (hidden > 0 ? $"  ·  {hidden} idle hidden" : "");
 
         // Keep the bottom edge anchored when the height changes.
         if (IsVisible)
@@ -81,6 +82,13 @@ public partial class SummaryPopup : Window
         RefreshButton.IsEnabled = false;
         await _host.RefreshAsync();
         RefreshButton.IsEnabled = true;
+    }
+
+    private void OnGroupClick(object sender, MouseButtonEventArgs e)
+    {
+        if (sender is not FrameworkElement { DataContext: LimitGroup { CanCollapse: true } group }) return;
+        group.Toggle(_host.Settings.CollapsedTrayGroups);
+        _host.SaveSettings(); // raises Changed, which rebuilds the list
     }
 
     private void OnItem(object sender, MouseButtonEventArgs e)
