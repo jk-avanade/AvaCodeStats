@@ -1,7 +1,6 @@
 using System.Diagnostics;
 using System.Globalization;
 using System.Text.Json;
-using AvaCodeStats.Core.Providers.Claude;
 
 namespace AvaCodeStats.Core.Providers.Antigravity;
 
@@ -51,6 +50,7 @@ public sealed class AntigravityProvider(string account, string? agyPath) : IUsag
         var psi = new ProcessStartInfo(exe)
         {
             RedirectStandardOutput = true, RedirectStandardError = true, UseShellExecute = false, CreateNoWindow = true,
+            WindowStyle = ProcessWindowStyle.Hidden,
         };
         foreach (var a in new[] { "-p", "/quota", "--output-format", "json" }) psi.ArgumentList.Add(a);
 
@@ -83,17 +83,17 @@ public sealed class AntigravityProvider(string account, string? agyPath) : IUsag
         var result = new List<UsageSnapshot>();
         foreach (var g in groups.EnumerateArray())
         {
-            var group = ShortGroup(ClaudeCodeProvider.Str(g, "name") ?? "Models");
+            var group = ShortGroup(JsonHelpers.Str(g, "name") ?? "Models");
             if (!g.TryGetProperty("buckets", out var buckets) || buckets.ValueKind != JsonValueKind.Array) continue;
             foreach (var b in buckets.EnumerateArray())
             {
                 if (!b.TryGetProperty("remaining_fraction", out var rf) || rf.ValueKind != JsonValueKind.Number) continue;
-                if (ClaudeCodeProvider.Str(b, "reset_time") is not { } resetText
+                if (JsonHelpers.Str(b, "reset_time") is not { } resetText
                     || !DateTimeOffset.TryParse(resetText, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var reset)) continue;
-                var window = ClaudeCodeProvider.Str(b, "window") ?? "weekly";
+                var window = JsonHelpers.Str(b, "window") ?? "weekly";
                 var span = window == "5h" ? TimeSpan.FromHours(5) : window == "daily" ? TimeSpan.FromDays(1) : TimeSpan.FromDays(7);
                 var label = window switch { "5h" => "5-hour", "daily" => "Daily", _ => "Weekly" };
-                var id = ClaudeCodeProvider.Str(b, "id") ?? $"{group}-{window}";
+                var id = JsonHelpers.Str(b, "id") ?? $"{group}-{window}";
                 result.Add(new UsageSnapshot(Id, account, id, $"{group} · {label}",
                     Math.Round((1 - Math.Clamp(rf.GetDouble(), 0, 1)) * 100, 2), 100, false,
                     reset - span, reset, now));

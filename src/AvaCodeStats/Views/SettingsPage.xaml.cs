@@ -1,6 +1,7 @@
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
+using System.Windows.Threading;
 using AvaCodeStats.Core;
 using AvaCodeStats.Theming;
 
@@ -9,6 +10,7 @@ namespace AvaCodeStats.Views;
 public partial class SettingsPage : UserControl, IPage
 {
     private readonly AppHost _host;
+    private readonly DispatcherTimer _thresholdSave = new() { Interval = TimeSpan.FromMilliseconds(250) };
     private bool _loading;
 
     internal SettingsPage(AppHost host)
@@ -16,6 +18,8 @@ public partial class SettingsPage : UserControl, IPage
         _host = host;
         InitializeComponent();
         PollMinutes.ItemsSource = new[] { 1, 2, 5, 10, 15, 30, 60 }.Select(m => new Choice(m == 1 ? "1 minute" : $"{m} minutes", m)).ToList();
+        _thresholdSave.Tick += (_, _) => { _thresholdSave.Stop(); _host.Settings.Save(); };
+        Unloaded += (_, _) => { if (_thresholdSave.IsEnabled) { _thresholdSave.Stop(); _host.Settings.Save(); } };
     }
 
     public string Title => "Settings";
@@ -128,7 +132,8 @@ public partial class SettingsPage : UserControl, IPage
         s.CriticalAtPercent = (int)CriticalSlider.Value;
         WarnValue.Text = Percent(s.WarnAtPercent);
         CriticalValue.Text = Percent(s.CriticalAtPercent);
-        s.Save(); // no full refresh while dragging
+        _thresholdSave.Stop();
+        _thresholdSave.Start(); // debounce writes while dragging
     }
 
     private void OnFarOverPace(object sender, RoutedEventArgs e)

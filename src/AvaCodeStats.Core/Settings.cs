@@ -152,6 +152,16 @@ public sealed class AppSettings
     {
         if (ReadOnly) return;
         Directory.CreateDirectory(DataDirectory);
-        File.WriteAllText(SettingsPath, JsonSerializer.Serialize(this, Json));
+        // Write aside and swap in, so a crash or a concurrent save never leaves a half-written file.
+        var tmp = $"{SettingsPath}.tmp.{Environment.ProcessId}.{Environment.CurrentManagedThreadId}";
+        try
+        {
+            File.WriteAllText(tmp, JsonSerializer.Serialize(this, Json));
+            File.Move(tmp, SettingsPath, overwrite: true);
+        }
+        finally
+        {
+            if (File.Exists(tmp)) File.Delete(tmp);
+        }
     }
 }

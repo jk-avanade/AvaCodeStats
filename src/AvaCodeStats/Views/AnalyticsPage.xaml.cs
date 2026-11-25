@@ -53,16 +53,23 @@ public partial class AnalyticsPage : UserControl, IPage
 
     public async void Refresh()
     {
-        var version = ++_version;
-        var settings = _host.Settings;
-        var sources = settings.ActiveSources();
-        var prices = new PriceTable(settings.Pricing);
-        var (from, to, bucket) = Window(_range);
-        var report = await Task.Run(() =>
-            TokenReport.Build(_host.Collector.Tokens.GetEvents(from, to, sources), prices, from, to, bucket, TimeZoneInfo.Local));
-        if (version != _version) return;
-        _report = report;
-        Render(bucket);
+        try
+        {
+            var version = ++_version;
+            var settings = _host.Settings;
+            var sources = settings.ActiveSources();
+            var prices = new PriceTable(settings.Pricing);
+            var (from, to, bucket) = Window(_range);
+            var report = await Task.Run(() =>
+                TokenReport.Build(_host.Collector.Tokens.GetEvents(from, to, sources), prices, from, to, bucket, TimeZoneInfo.Local));
+            if (version != _version) return;
+            _report = report;
+            Render(bucket);
+        }
+        catch (Exception ex)
+        {
+            CrashLog.Write(ex);
+        }
     }
 
     private static (DateTimeOffset from, DateTimeOffset to, TimeSpan bucket) Window(string range)
@@ -123,7 +130,7 @@ public partial class AnalyticsPage : UserControl, IPage
             var speed = new[] { ("Standard", rep.StandardSpeed.Total, shades[1]), ("Fast", rep.FastSpeed.Total, shades[3]) };
             SpeedBar.SetParts(speed.Select(x => (x.Item2, x.Item3)).ToList());
             SpeedLegend.ItemsSource = speed.Select(x => new LegendEntry(x.Item1, Fmt.Money(x.Item2), ThemeService.Brush(x.Item3))).ToList();
-            FastPremium.Text = $"Fast premium {Fmt.Money(rep.FastSpeed.Total / 2)}";
+            FastPremium.Text = $"Fast premium {Fmt.Money(rep.FastSpeed.FastPremium)}";
         }
 
         DrawChart(rep, bucket);

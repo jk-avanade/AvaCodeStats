@@ -14,6 +14,7 @@ namespace AvaCodeStats.Theming;
 internal static class ThemeService
 {
     private static AppSettings? _settings;
+    private static bool _subscribed;
 
     public static Palette Current { get; private set; } = Palette.For(true, "default");
 
@@ -23,18 +24,35 @@ internal static class ThemeService
     public static void Initialise(AppSettings settings)
     {
         _settings = settings;
-        SystemEvents.UserPreferenceChanged += (_, e) =>
+        if (!_subscribed)
         {
-            if (e.Category == UserPreferenceCategory.General && _settings?.ThemeMode == "system")
-                Application.Current.Dispatcher.BeginInvoke(() => Apply(_settings));
-        };
+            SystemEvents.UserPreferenceChanged += OnUserPreferenceChanged;
+            _subscribed = true;
+        }
         Apply(settings);
+    }
+
+    public static void Shutdown()
+    {
+        if (!_subscribed) return;
+        SystemEvents.UserPreferenceChanged -= OnUserPreferenceChanged;
+        _subscribed = false;
+    }
+
+    private static void OnUserPreferenceChanged(object sender, UserPreferenceChangedEventArgs e)
+    {
+        if (e.Category == UserPreferenceCategory.General && _settings is { ThemeMode: "system" } s
+            && Application.Current is { Dispatcher: { } d })
+        {
+            d.BeginInvoke(() => Apply(s));
+        }
     }
 
     public static void Apply(AppSettings settings)
     {
         _settings = settings;
         var app = Application.Current;
+        if (app is null) return;
         app.ThemeMode = settings.ThemeMode switch
         {
             "light" => ThemeMode.Light,

@@ -12,7 +12,6 @@ public sealed class GitHubCopilotProvider(string account, Func<CancellationToken
     private static readonly Uri Endpoint = new("https://api.github.com/copilot_internal/user");
 
     private string? _token;
-    private DateTimeOffset _tokenFetched;
 
     public string ProviderId => CopilotQuotaParser.ProviderId;
     public string AccountId => account;
@@ -41,13 +40,10 @@ public sealed class GitHubCopilotProvider(string account, Func<CancellationToken
         return await res.Content.ReadAsStringAsync(ct);
     }
 
+    /// <summary>Cached until GitHub rejects it (FetchAsync then asks for a fresh one), so gh is not spawned on every poll.</summary>
     private async Task<string> TokenAsync(bool refresh, CancellationToken ct)
     {
-        if (refresh || _token is null || DateTimeOffset.UtcNow - _tokenFetched > TimeSpan.FromMinutes(30))
-        {
-            _token = await tokenSource(ct);
-            _tokenFetched = DateTimeOffset.UtcNow;
-        }
+        if (refresh || _token is null) _token = await tokenSource(ct);
         return _token;
     }
 }

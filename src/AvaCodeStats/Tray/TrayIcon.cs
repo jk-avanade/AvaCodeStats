@@ -153,6 +153,8 @@ internal sealed class TrayIcon : IDisposable
 
     public void Dispose()
     {
+        _host.Changed -= Render;
+        Theming.ThemeService.Changed -= Render;
         _clickTimer.Dispose();
         _icon.Visible = false;
         _icon.Dispose();

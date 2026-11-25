@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using AvaCodeStats.Core.Providers;
 using AvaCodeStats.Core.Storage;
 using AvaCodeStats.Core.Tokens;
@@ -7,8 +8,9 @@ namespace AvaCodeStats.Core;
 /// <summary>Polls every provider, writes history, and keeps the latest snapshot per quota.</summary>
 public sealed class UsageCollector(UsageStore store, TokenStore tokens)
 {
-    private readonly Dictionary<SubscriptionKey, UsageSnapshot> _latest = [];
-    private readonly Dictionary<string, string> _errors = [];
+    // Written by polls on background threads while the UI reads them.
+    private readonly ConcurrentDictionary<SubscriptionKey, UsageSnapshot> _latest = new();
+    private readonly ConcurrentDictionary<string, string> _errors = new();
     private readonly SemaphoreSlim _gate = new(1, 1);
 
     public UsageStore Store => store;
@@ -35,7 +37,8 @@ public sealed class UsageCollector(UsageStore store, TokenStore tokens)
     /// <summary>Treats the newest recorded reading as the last collection (screenshot mode, which does not poll).</summary>
     public void UseHistoryAsLastCollection()
     {
-        if (_latest.Count > 0) LastCollectedUtc = _latest.Values.Max(s => s.TimestampUtc);
+        var values = _latest.Values;
+        if (values.Count > 0) LastCollectedUtc = values.Max(s => s.TimestampUtc);
     }
 
     public async Task CollectAsync(CancellationToken ct = default)
@@ -56,7 +59,7 @@ public sealed class UsageCollector(UsageStore store, TokenStore tokens)
             {
                 var id = $"{p.ProviderId}:{p.AccountId}";
                 if (error is not null) { _errors[id] = error; continue; }
-                _errors.Remove(id);
+                _errors.TryRemove(id, out _);
                 foreach (var s in snapshots)
                 {
                     store.Add(s);

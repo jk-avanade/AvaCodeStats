@@ -1,6 +1,5 @@
 using System.Text;
 using System.Text.Json;
-using AvaCodeStats.Core.Providers.Claude;
 
 namespace AvaCodeStats.Core.Providers.GrokBot;
 
@@ -43,19 +42,19 @@ public sealed class GrokBotProvider(string account, string? dataDir) : IUsagePro
     public static UsageSnapshot? Parse(string json, string account, DateTimeOffset now)
     {
         using var doc = JsonDocument.Parse(json);
-        if (!doc.RootElement.TryGetProperty("value", out var v) || ClaudeCodeProvider.Str(v, "kind") != "present"
+        if (!doc.RootElement.TryGetProperty("value", out var v) || JsonHelpers.Str(v, "kind") != "present"
             || !v.TryGetProperty("reading", out var reading) || !reading.TryGetProperty("usage", out var usage))
             return null;
 
-        var used = ClaudeCodeProvider.Num(usage, "percentUsed");
-        var reset = DateTimeOffset.FromUnixTimeMilliseconds(ClaudeCodeProvider.Long(usage, "nextResetMs"));
-        var readAt = DateTimeOffset.FromUnixTimeMilliseconds(ClaudeCodeProvider.Long(reading, "readAtMs"));
+        var used = JsonHelpers.Num(usage, "percentUsed");
+        var reset = DateTimeOffset.FromUnixTimeMilliseconds(JsonHelpers.Long(usage, "nextResetMs"));
+        var readAt = DateTimeOffset.FromUnixTimeMilliseconds(JsonHelpers.Long(reading, "readAtMs"));
         if (reset.ToUnixTimeMilliseconds() <= 0) return null;
 
         var week = TimeSpan.FromDays(7);
         while (reset <= now) { reset += week; used = 0; readAt = now; }
 
-        var plan = ClaudeCodeProvider.Str(usage, "unifiedPlanName") ?? ClaudeCodeProvider.Str(usage, "grokPlanLabel");
+        var plan = JsonHelpers.Str(usage, "unifiedPlanName") ?? JsonHelpers.Str(usage, "grokPlanLabel");
         return new UsageSnapshot(Id, account, "weekly", "Weekly", Math.Round(used, 2), 100, false,
             reset - week, reset, readAt, plan is null ? null : $"Grok Bot {plan}");
     }

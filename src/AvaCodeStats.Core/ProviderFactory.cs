@@ -11,7 +11,11 @@ namespace AvaCodeStats.Core;
 /// <summary>Turns settings into provider instances. Add new subscription types here.</summary>
 public static class ProviderFactory
 {
-    private static readonly HttpClient Http = new() { Timeout = TimeSpan.FromSeconds(30) };
+    // Long-lived client; recycling pooled connections picks up DNS changes.
+    private static readonly HttpClient Http = new(new SocketsHttpHandler { PooledConnectionLifetime = TimeSpan.FromMinutes(5) })
+    {
+        Timeout = TimeSpan.FromSeconds(30),
+    };
 
     public static IReadOnlyDictionary<string, string> DisplayNames { get; } = new Dictionary<string, string>
     {

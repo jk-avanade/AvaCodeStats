@@ -22,6 +22,9 @@ public sealed class UsageStore
     {
         var c = new SqliteConnection(_connectionString);
         c.Open();
+        using var cmd = c.CreateCommand();
+        cmd.CommandText = "PRAGMA busy_timeout = 5000;"; // wait out other writers (another instance, the token scan)
+        cmd.ExecuteNonQuery();
         return c;
     }
 
@@ -54,7 +57,8 @@ public sealed class UsageStore
     /// <returns>True when a row was written.</returns>
     public bool Add(UsageSnapshot s)
     {
-        var last = GetLatest(s.Key);
+        using var c = Open();
+        var last = GetLatest(c, s.Key);
         if (last is not null
             && last.Used.Equals(s.Used)
             && last.Entitlement.Equals(s.Entitlement)
@@ -66,7 +70,6 @@ public sealed class UsageStore
             return false;
         }
 
-        using var c = Open();
         using var cmd = c.CreateCommand();
         cmd.CommandText = """
             INSERT INTO samples (provider, account, metric, metric_name, ts_utc, used, entitlement,
@@ -91,6 +94,11 @@ public sealed class UsageStore
     public UsageSnapshot? GetLatest(SubscriptionKey key)
     {
         using var c = Open();
+        return GetLatest(c, key);
+    }
+
+    private static UsageSnapshot? GetLatest(SqliteConnection c, SubscriptionKey key)
+    {
         using var cmd = c.CreateCommand();
         cmd.CommandText = $"{SelectColumns} WHERE provider = $p AND account = $a AND metric = $m ORDER BY ts_utc DESC LIMIT 1;";
         AddKey(cmd, key);

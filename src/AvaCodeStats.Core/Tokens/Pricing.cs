@@ -17,14 +17,16 @@ public sealed class ModelPrice
     public double Write1h => CacheWrite1h ?? Input * 2;
 }
 
-public sealed record CostParts(double Input, double CacheRead, double CacheWrite, double Output, double CacheSavings, bool Priced)
+/// <param name="FastPremium">The part of the other figures that is the fast-mode surcharge (already included in <see cref="Total"/>).</param>
+public sealed record CostParts(double Input, double CacheRead, double CacheWrite, double Output, double CacheSavings, bool Priced,
+    double FastPremium = 0)
 {
     public double Total => Input + CacheRead + CacheWrite + Output;
     public static CostParts Zero { get; } = new(0, 0, 0, 0, 0, true);
 
     public static CostParts operator +(CostParts a, CostParts b) =>
         new(a.Input + b.Input, a.CacheRead + b.CacheRead, a.CacheWrite + b.CacheWrite, a.Output + b.Output,
-            a.CacheSavings + b.CacheSavings, a.Priced && b.Priced);
+            a.CacheSavings + b.CacheSavings, a.Priced && b.Priced, a.FastPremium + b.FastPremium);
 }
 
 /// <summary>
@@ -66,13 +68,16 @@ public sealed class PriceTable
         if (Find(e.Model) is not { } p) return CostParts.Zero with { Priced = false };
         var m = e.Speed == "fast" ? p.FastMultiplier : 1;
         const double M = 1_000_000;
+        var input = e.Input * p.Input / M;
+        var cacheRead = e.CacheRead * p.CacheRead / M;
+        var cacheWrite = (e.CacheWrite5m * p.Write5m + e.CacheWrite1h * p.Write1h) / M;
+        var output = e.Output * p.Output / M;
+        var baseTotal = input + cacheRead + cacheWrite + output;
         return new CostParts(
-            e.Input * p.Input * m / M,
-            e.CacheRead * p.CacheRead * m / M,
-            (e.CacheWrite5m * p.Write5m + e.CacheWrite1h * p.Write1h) * m / M,
-            e.Output * p.Output * m / M,
+            input * m, cacheRead * m, cacheWrite * m, output * m,
             e.CacheRead * (p.Input - p.CacheRead) * m / M,
-            true);
+            true,
+            m > 1 ? baseTotal * (m - 1) : 0);
     }
 
     private static ModelPrice P(string model, double input, double output, double cacheRead) =>

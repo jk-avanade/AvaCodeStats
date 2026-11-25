@@ -10,11 +10,38 @@ public class AlertAndLiveTests
     private static UsageSnapshot Snap(double used, string metric = "m") =>
         new("test", "me", metric, "Metric", used, 100, false, Start, End, Start);
 
-    private static (List<Alert> alerts, HashSet<string> fired) Run(IEnumerable<UsageSnapshot> snaps, AppSettings s, DateTimeOffset now, HashSet<string>? fired = null)
+    private static (List<Alert> alerts, Dictionary<string, string> fired) Run(IEnumerable<UsageSnapshot> snaps, AppSettings s, DateTimeOffset now, Dictionary<string, string>? fired = null)
     {
         fired ??= [];
-        var alerts = AlertRules.Evaluate(snaps, s, now, fired.Contains, k => fired.Add(k)).ToList();
+        var alerts = AlertRules.Evaluate(snaps, s, now, k => fired.GetValueOrDefault(k), (k, v) => fired[k] = v).ToList();
         return (alerts, fired);
+    }
+
+    [Fact]
+    public void Jittered_reset_times_do_not_refire_but_a_new_period_does()
+    {
+        var s = new AppSettings { WarnAtPercent = 75, CriticalAtPercent = 90, NotifyWhenFarOverPace = false };
+        var now = Start.AddDays(28);
+        UsageSnapshot Jittered(double used, TimeSpan jitter) => Snap(used) with { PeriodStartUtc = Start + jitter, PeriodEndUtc = End + jitter };
+
+        var (first, fired) = Run([Jittered(80, TimeSpan.FromMilliseconds(145))], s, now);
+        Assert.Single(first);
+        Assert.Empty(Run([Jittered(81, TimeSpan.FromMilliseconds(924))], s, now, fired).alerts);
+        Assert.Empty(Run([Jittered(82, TimeSpan.FromSeconds(-1))], s, now, fired).alerts);
+        Assert.Empty(Run([Jittered(83, UsageSnapshot.PeriodJitter)], s, now, fired).alerts);
+
+        var next = Snap(80) with { PeriodStartUtc = End.AddMilliseconds(300), PeriodEndUtc = End.AddMonths(1) };
+        Assert.Equal([AlertLevel.Warning], Run([next], s, End.AddDays(28), fired).alerts.Select(a => a.Level));
+        Assert.Empty(Run([next with { PeriodStartUtc = End }], s, End.AddDays(28), fired).alerts);
+    }
+
+    [Fact]
+    public void Legacy_exact_period_overload_still_fires_once()
+    {
+        var s = new AppSettings { WarnAtPercent = 75, CriticalAtPercent = 90, NotifyWhenFarOverPace = false };
+        var fired = new HashSet<string>();
+        Assert.Single(AlertRules.Evaluate([Snap(80)], s, Start.AddDays(28), fired.Contains, k => fired.Add(k)));
+        Assert.Empty(AlertRules.Evaluate([Snap(81)], s, Start.AddDays(28), fired.Contains, k => fired.Add(k)));
     }
 
     [Fact]

@@ -98,6 +98,27 @@ public class ToolLogTests
     }
 
     [Fact]
+    public void Fast_premium_is_the_surcharge_over_the_standard_price()
+    {
+        var e = new TokenEvent("claude-code:me", "1", DateTimeOffset.UtcNow, "s", "claude-opus-5-5",
+            Input: 1_000_000, CacheRead: 1_000_000, CacheWrite5m: 0, CacheWrite1h: 0, Output: 1_000_000);
+        var prices = new PriceTable();
+        var standard = prices.Cost(e);
+        Assert.Equal(0, standard.FastPremium);
+
+        var fast = prices.Cost(e with { Speed = "fast" }); // default multiplier 2
+        Assert.Equal(standard.Total, fast.FastPremium, 6);
+        Assert.Equal(standard.Total + fast.FastPremium, fast.Total, 6);
+
+        var custom = new PriceTable([new ModelPrice { Model = "claude-opus-5-5", Input = 4, Output = 20, CacheRead = 0.2, FastMultiplier = 1.5 }]);
+        var fast15 = custom.Cost(e with { Speed = "fast" });
+        Assert.Equal(0.5 * standard.Total, fast15.FastPremium, 6);
+        Assert.Equal(1.5 * standard.Total, fast15.Total, 6);
+
+        Assert.Equal(fast.FastPremium + fast15.FastPremium, (fast + fast15 + standard).FastPremium, 6);
+    }
+
+    [Fact]
     public void Report_groups_by_provider_model_and_day()
     {
         var day = new DateTimeOffset(2026, 11, 20, 3, 0, 0, TimeSpan.Zero);

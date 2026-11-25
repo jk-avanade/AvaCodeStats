@@ -1,6 +1,5 @@
 using System.Net.Http.Headers;
 using System.Text.Json;
-using AvaCodeStats.Core.Providers.Claude;
 using AvaCodeStats.Core.Tokens;
 
 namespace AvaCodeStats.Core.Providers.Codex;
@@ -46,8 +45,8 @@ public sealed class CodexProvider(string account, string codexHome, TokenStore t
             using (var doc = JsonDocument.Parse(await File.ReadAllTextAsync(path, ct)))
             {
                 if (!doc.RootElement.TryGetProperty("tokens", out var t) || t.ValueKind != JsonValueKind.Object) return null;
-                token = ClaudeCodeProvider.Str(t, "access_token");
-                accountId = ClaudeCodeProvider.Str(t, "account_id");
+                token = JsonHelpers.Str(t, "access_token");
+                accountId = JsonHelpers.Str(t, "account_id");
             }
             if (token is null) return null;
 
@@ -60,7 +59,8 @@ public sealed class CodexProvider(string account, string codexHome, TokenStore t
             if (!res.IsSuccessStatusCode) return null; // expired sign-in etc.: the logs still work
             return ParseLive(await res.Content.ReadAsStringAsync(ct), account, DateTimeOffset.UtcNow);
         }
-        catch (Exception e) when (e is HttpRequestException or JsonException or IOException or TaskCanceledException)
+        catch (Exception e) when (e is HttpRequestException or JsonException or IOException
+                                   || (e is TaskCanceledException && !ct.IsCancellationRequested))
         {
             return null;
         }
@@ -72,18 +72,18 @@ public sealed class CodexProvider(string account, string codexHome, TokenStore t
         using var doc = JsonDocument.Parse(json);
         var root = doc.RootElement;
         if (!root.TryGetProperty("rate_limit", out var rl) || rl.ValueKind != JsonValueKind.Object) return [];
-        var plan = ClaudeCodeProvider.Str(root, "plan_type");
+        var plan = JsonHelpers.Str(root, "plan_type");
         var result = new List<UsageSnapshot>();
         foreach (var (slot, name) in new[] { ("primary", "primary_window"), ("secondary", "secondary_window") })
         {
             if (!rl.TryGetProperty(name, out var w) || w.ValueKind != JsonValueKind.Object) continue;
-            var seconds = ClaudeCodeProvider.Num(w, "limit_window_seconds");
+            var seconds = JsonHelpers.Num(w, "limit_window_seconds");
             if (seconds <= 0) continue;
             var minutes = seconds / 60;
             var window = TimeSpan.FromSeconds(seconds);
-            var reset = DateTimeOffset.FromUnixTimeSeconds(ClaudeCodeProvider.Long(w, "reset_at"));
+            var reset = DateTimeOffset.FromUnixTimeSeconds(JsonHelpers.Long(w, "reset_at"));
             result.Add(new UsageSnapshot(Id, account, $"{slot}_{minutes:0}", WindowName(minutes),
-                ClaudeCodeProvider.Num(w, "used_percent"), 100, false, reset - window, reset, now,
+                JsonHelpers.Num(w, "used_percent"), 100, false, reset - window, reset, now,
                 plan is null ? null : $"ChatGPT {plan}"));
         }
         return result;
@@ -148,28 +148,28 @@ public sealed class CodexProvider(string account, string codexHome, TokenStore t
                 using var doc = JsonDocument.Parse(line);
                 var r = doc.RootElement;
                 if (!r.TryGetProperty("payload", out var p) || p.ValueKind != JsonValueKind.Object) continue;
-                switch (ClaudeCodeProvider.Str(r, "type"))
+                switch (JsonHelpers.Str(r, "type"))
                 {
                     case "session_meta":
-                        state.Session = ClaudeCodeProvider.Str(p, "id") ?? state.Session;
+                        state.Session = JsonHelpers.Str(p, "id") ?? state.Session;
                         break;
                     case "turn_context":
-                        state.Model = ClaudeCodeProvider.Str(p, "model") ?? state.Model;
+                        state.Model = JsonHelpers.Str(p, "model") ?? state.Model;
                         break;
-                    case "event_msg" when ClaudeCodeProvider.Str(p, "type") == "token_count":
-                        if (!ClaudeCodeProvider.TryDate(r, "timestamp", out var ts)) break;
+                    case "event_msg" when JsonHelpers.Str(p, "type") == "token_count":
+                        if (!JsonHelpers.TryDate(r, "timestamp", out var ts)) break;
                         if (p.TryGetProperty("info", out var info) && info.ValueKind == JsonValueKind.Object
                             && info.TryGetProperty("last_token_usage", out var last) && last.ValueKind == JsonValueKind.Object
                             && info.TryGetProperty("total_token_usage", out var total))
                         {
-                            var input = ClaudeCodeProvider.Long(last, "input_tokens");
-                            var cached = ClaudeCodeProvider.Long(last, "cached_input_tokens");
+                            var input = JsonHelpers.Long(last, "input_tokens");
+                            var cached = JsonHelpers.Long(last, "cached_input_tokens");
                             events.Add(new TokenEvent(source,
-                                $"{state.Session}:{ClaudeCodeProvider.Long(total, "total_tokens")}",
+                                $"{state.Session}:{JsonHelpers.Long(total, "total_tokens")}",
                                 ts, state.Session, state.Model,
                                 Math.Max(0, input - cached), cached,
-                                ClaudeCodeProvider.Long(last, "cache_write_input_tokens"), 0,
-                                ClaudeCodeProvider.Long(last, "output_tokens")));
+                                JsonHelpers.Long(last, "cache_write_input_tokens"), 0,
+                                JsonHelpers.Long(last, "output_tokens")));
                         }
                         if (p.TryGetProperty("rate_limits", out var rl) && rl.ValueKind == JsonValueKind.Object && ts > latestTs)
                         {
@@ -187,8 +187,14 @@ public sealed class CodexProvider(string account, string codexHome, TokenStore t
     private static DateTimeOffset LimitsTimestamp(string? json)
     {
         if (json is null) return DateTimeOffset.MinValue;
-        using var doc = JsonDocument.Parse(json);
-        return doc.RootElement.GetProperty("ts").GetDateTimeOffset();
+        try
+        {
+            using var doc = JsonDocument.Parse(json);
+            return doc.RootElement.TryGetProperty("ts", out var ts) && ts.TryGetDateTimeOffset(out var value)
+                ? value
+                : DateTimeOffset.MinValue;
+        }
+        catch (JsonException) { return DateTimeOffset.MinValue; }
     }
 
     public static IReadOnlyList<UsageSnapshot> ParseLimits(string json, string account, DateTimeOffset now)
@@ -196,16 +202,16 @@ public sealed class CodexProvider(string account, string codexHome, TokenStore t
         using var doc = JsonDocument.Parse(json);
         var observed = doc.RootElement.GetProperty("ts").GetDateTimeOffset();
         var rl = doc.RootElement.GetProperty("rate_limits");
-        var plan = ClaudeCodeProvider.Str(rl, "plan_type");
+        var plan = JsonHelpers.Str(rl, "plan_type");
         var result = new List<UsageSnapshot>();
         foreach (var slot in new[] { "primary", "secondary" })
         {
             if (!rl.TryGetProperty(slot, out var w) || w.ValueKind != JsonValueKind.Object) continue;
-            var minutes = ClaudeCodeProvider.Num(w, "window_minutes");
+            var minutes = JsonHelpers.Num(w, "window_minutes");
             if (minutes <= 0) continue;
             var window = TimeSpan.FromMinutes(minutes);
-            var reset = DateTimeOffset.FromUnixTimeSeconds(ClaudeCodeProvider.Long(w, "resets_at"));
-            var used = ClaudeCodeProvider.Num(w, "used_percent");
+            var reset = DateTimeOffset.FromUnixTimeSeconds(JsonHelpers.Long(w, "resets_at"));
+            var used = JsonHelpers.Num(w, "used_percent");
 
             // The log only knows the window it last saw; once that window ends, usage is back to 0.
             while (reset <= now) { reset += window; used = 0; }

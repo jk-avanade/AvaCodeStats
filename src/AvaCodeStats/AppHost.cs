@@ -109,8 +109,8 @@ internal sealed class AppHost : IDisposable
         var alerts = AlertRules.Evaluate(
             Collector.Latest.Values.Where(s => enabled.Contains($"{s.ProviderId}:{s.AccountId}")),
             Settings, DateTimeOffset.UtcNow,
-            key => Collector.Tokens.GetValue(key) is not null,
-            key => Collector.Tokens.SetValue(key, DateTimeOffset.UtcNow.ToString("O")));
+            key => Collector.Tokens.GetValue(key),
+            (key, value) => Collector.Tokens.SetValue(key, value));
         foreach (var a in alerts.Take(3)) _tray?.Notify(a);
         RaiseChanged();
     }
@@ -174,12 +174,15 @@ internal sealed class AppHost : IDisposable
 
     private async void OnPowerModeChanged(object? sender, PowerModeChangedEventArgs e)
     {
-        if (e.Mode == PowerModes.Resume) await RefreshAsync();
+        if (e.Mode != PowerModes.Resume) return;
+        try { await RefreshAsync(); }
+        catch (Exception ex) { CrashLog.Write(ex); }
     }
 
     public void Dispose()
     {
         SystemEvents.PowerModeChanged -= OnPowerModeChanged;
+        ThemeService.Shutdown();
         _poll.Stop();
         _tick.Stop();
         _tray?.Dispose();

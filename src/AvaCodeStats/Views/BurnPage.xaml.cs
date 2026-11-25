@@ -187,6 +187,18 @@ public partial class BurnPage : UserControl, IPage
 
     private async void DrawOverview(List<LimitItem> items, bool single)
     {
+        try
+        {
+            await DrawOverviewCoreAsync(items, single);
+        }
+        catch (Exception ex)
+        {
+            CrashLog.Write(ex);
+        }
+    }
+
+    private async Task DrawOverviewCoreAsync(List<LimitItem> items, bool single)
+    {
         var version = ++_version;
         var (from, to, hourly, rangeLabel) = Window(_range);
         var store = _host.Collector.Store;

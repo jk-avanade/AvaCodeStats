@@ -1,4 +1,5 @@
 using AvaCodeStats.Core.Storage;
+using AvaCodeStats.Core.Tokens;
 
 namespace AvaCodeStats.Core.Tests;
 
@@ -147,6 +148,124 @@ public sealed class StoreAndAnalyticsTests : IDisposable
         Assert.Equal(0.75, UsageAnalytics.TimeAverage(line, t0, t0.AddHours(20))!.Value, 6);
         Assert.Equal(1.0, UsageAnalytics.TimeAverage(line, t0.AddHours(10), t0.AddHours(40))!.Value, 6);
         Assert.Null(UsageAnalytics.TimeAverage(line, t0.AddHours(30), t0.AddHours(40)));
+    }
+
+    [Fact]
+    public void Token_events_filter_by_source_in_sql()
+    {
+        var tokens = new TokenStore(_db);
+        TokenEvent E(string source, int i) => new(source, $"e{i}", Start.AddHours(i), "s", "m", 1, 2, 3, 4, 5);
+        tokens.Upsert([E("a:1", 1), E("b:1", 2), E("c:1", 3), E("a:1", 4)]);
+
+        var subset = tokens.GetEvents(Start, End, new HashSet<string> { "a:1", "c:1" });
+        Assert.Equal(["a:1", "c:1", "a:1"], subset.Select(e => e.Source));
+        Assert.Equal(5, subset[0].Output);
+        Assert.Empty(tokens.GetEvents(Start, End, new HashSet<string>()));
+        Assert.Equal(4, tokens.GetEvents(Start, End).Count);
+    }
+
+    [Fact]
+    public void Scan_reads_large_appends_in_chunks_and_keeps_a_partial_last_line()
+    {
+        var log = _db + ".jsonl";
+        try
+        {
+            var tokens = new TokenStore(_db) { ScanChunkBytes = 8 };
+            var seen = new List<string>();
+            string Collect(IEnumerable<string> lines, string? ctx)
+            {
+                seen.AddRange(lines);
+                return (int.Parse(ctx ?? "0") + 1).ToString();
+            }
+
+            File.WriteAllText(log, "one\na-line-longer-than-a-chunk\nthree\npart");
+            tokens.ScanAppended(log, Collect);
+            Assert.Equal(["one", "a-line-longer-than-a-chunk", "three"], seen);
+
+            seen.Clear();
+            File.AppendAllText(log, "ial\n");
+            string? context = null;
+            tokens.ScanAppended(log, (lines, ctx) => { context = ctx; return Collect(lines, ctx); });
+            Assert.Equal(["partial"], seen);
+            Assert.NotNull(context); // carried over from the earlier calls
+
+            seen.Clear();
+            tokens.ScanAppended(log, Collect);
+            Assert.Empty(seen);
+        }
+        finally
+        {
+            File.Delete(log);
+        }
+    }
+
+    private sealed class FakeProvider(string account, Func<int, IReadOnlyList<UsageSnapshot>> fetch) : Providers.IUsageProvider
+    {
+        private int _calls;
+        public string ProviderId => "test";
+        public string AccountId => account;
+        public string DisplayName => "Test";
+
+        public async Task<IReadOnlyList<UsageSnapshot>> FetchAsync(CancellationToken ct)
+        {
+            await Task.Yield();
+            return fetch(Interlocked.Increment(ref _calls));
+        }
+    }
+
+    [Fact]
+    public async Task Collector_keeps_good_providers_when_one_fails_and_clears_the_error_later()
+    {
+        var failing = true;
+        var collector = new UsageCollector(new UsageStore(_db), new TokenStore(_db))
+        {
+            Providers =
+            [
+                new FakeProvider("ok", _ => [At(1, 10) with { AccountId = "ok" }]),
+                new FakeProvider("bad", _ => failing ? throw new InvalidOperationException("boom") : []),
+            ],
+        };
+
+        await collector.CollectAsync();
+        Assert.Single(collector.Latest);
+        Assert.Equal("ok", collector.Latest.Values.Single().AccountId);
+        Assert.Equal("boom", collector.Errors["test:bad"]);
+        Assert.NotNull(collector.LastCollectedUtc);
+
+        failing = false;
+        await collector.CollectAsync();
+        Assert.Empty(collector.Errors);
+    }
+
+    [Fact]
+    public async Task Collector_can_be_read_while_a_poll_writes()
+    {
+        IReadOnlyList<UsageSnapshot> Batch(int call) =>
+            Enumerable.Range(0, 150).Select(i => At(1, i) with { MetricId = $"m{call}-{i}" }).ToList();
+        var collector = new UsageCollector(new UsageStore(_db), new TokenStore(_db))
+        {
+            Providers = [new FakeProvider("a", Batch), new FakeProvider("b", _ => throw new InvalidOperationException("x"))],
+        };
+
+        using var done = new CancellationTokenSource();
+        var reader = Task.Run(() =>
+        {
+            var reads = 0;
+            while (!done.IsCancellationRequested || reads == 0)
+            {
+                _ = collector.Latest.Values.Sum(s => s.Used);
+                foreach (var kv in collector.Latest) _ = kv.Value.MetricId;
+                _ = collector.Errors.Count + collector.Errors.Values.Count();
+                _ = collector.PickTray(null);
+                reads++;
+            }
+            return reads;
+        });
+
+        for (var i = 0; i < 3; i++) await collector.CollectAsync();
+        done.Cancel();
+        Assert.True(await reader > 0);
+        Assert.Equal(450, collector.Latest.Count);
     }
 
     public void Dispose()

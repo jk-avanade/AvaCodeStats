@@ -1,7 +1,7 @@
-using System.Globalization;
 using System.Net.Http.Headers;
 using System.Text.Json;
 using AvaCodeStats.Core.Tokens;
+using static AvaCodeStats.Core.Providers.JsonHelpers;
 
 namespace AvaCodeStats.Core.Providers.Claude;
 
@@ -135,21 +135,5 @@ public sealed class ClaudeCodeProvider(string account, string claudeHome, TokenS
             catch (JsonException) { }
             if (e is not null) yield return e;
         }
-    }
-
-    internal static string? Str(JsonElement e, string name) =>
-        e.TryGetProperty(name, out var v) && v.ValueKind == JsonValueKind.String ? v.GetString() : null;
-
-    internal static double Num(JsonElement e, string name) =>
-        e.TryGetProperty(name, out var v) && v.ValueKind == JsonValueKind.Number ? v.GetDouble() : 0;
-
-    internal static long Long(JsonElement e, string name) =>
-        e.TryGetProperty(name, out var v) && v.ValueKind == JsonValueKind.Number ? (long)v.GetDouble() : 0;
-
-    internal static bool TryDate(JsonElement e, string name, out DateTimeOffset value)
-    {
-        value = default;
-        return Str(e, name) is { } s
-               && DateTimeOffset.TryParse(s, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out value);
     }
 }
