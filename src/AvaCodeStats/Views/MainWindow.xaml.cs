@@ -22,6 +22,7 @@ public partial class MainWindow : Window
     private readonly AppHost _host;
     private readonly Dictionary<string, IPage> _pages = [];
     private IPage? _current;
+    internal IPage? CurrentPage => _current;
     private bool _syncing;
 
     internal MainWindow(AppHost host)

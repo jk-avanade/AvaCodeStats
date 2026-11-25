@@ -43,6 +43,20 @@ public partial class BurnPage : UserControl, IPage
         Refresh();
     }
 
+    /// <summary>Shows a scope by id: "all", "sub:provider:account" or "quota:provider:account:metric".</summary>
+    internal void ShowScope(string id)
+    {
+        _scope = id;
+        Refresh();
+    }
+
+    /// <summary>Picks a range: "24h", "7d", "30d" or "90d".</summary>
+    internal void SetRange(string range)
+    {
+        foreach (var r in ((Panel)RangeHost.Child).Children.OfType<RadioButton>())
+            if ((string)r.Tag == range) r.IsChecked = true;
+    }
+
     private static string QuotaScope(SubscriptionKey key) => $"quota:{key}";
 
     private sealed record Scope(string Id, string Label, bool IsGroup, int Level)

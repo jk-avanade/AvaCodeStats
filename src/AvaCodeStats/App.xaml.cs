@@ -4,7 +4,8 @@ namespace AvaCodeStats;
 
 /// <summary>
 /// Tray app. Options: --open [limits|burn|pace|cost|tokens|settings] opens the dashboard on start;
-/// --summary opens the tray summary popup; --screenshots &lt;folder&gt; saves README screenshots and exits.
+/// --summary opens the tray summary popup; --screenshots &lt;folder&gt; saves README screenshots and exits;
+/// --tour &lt;folder&gt; saves the frames of a short tour video (see scripts/make-video.py) and exits.
 /// </summary>
 public partial class App : Application
 {
@@ -14,15 +15,17 @@ public partial class App : Application
     protected override void OnStartup(StartupEventArgs e)
     {
         var shots = Array.IndexOf(e.Args, "--screenshots");
-        if (shots >= 0)
+        var tour = Array.IndexOf(e.Args, "--tour");
+        if (shots >= 0 || tour >= 0)
         {
             // Read-only and redacted, so it may run next to the tray instance.
             base.OnStartup(e);
             Privacy.Redact = true;
             _host = new AppHost();
             _host.StartReadOnly();
-            var folder = shots + 1 < e.Args.Length ? e.Args[shots + 1] : "screenshots";
-            _ = Screenshots.RunAsync(_host, System.IO.Path.GetFullPath(folder));
+            var at = Math.Max(shots, tour);
+            var folder = System.IO.Path.GetFullPath(at + 1 < e.Args.Length ? e.Args[at + 1] : tour >= 0 ? "tour" : "screenshots");
+            _ = tour >= 0 ? Screenshots.TourAsync(_host, folder) : Screenshots.RunAsync(_host, folder);
             return;
         }
 
