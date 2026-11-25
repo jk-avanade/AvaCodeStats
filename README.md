@@ -7,7 +7,8 @@ A Windows tray app that tracks AI coding subscriptions, shows whether you are bu
 - **Alerts**: a notification once per period when a quota passes the heads-up (75%) and critical (90%) levels, and when it goes far over pace. Set the levels in Settings.
 - **Dashboard** (WPF, Fluent theme with Mica; light, dark or system; Default or Avanade brand):
   - **Limits**: every quota as a bar. The fill shows what's left, the hatching shows what's used, and the tick shows where the fill would end at an even pace. Click a card to open its burn view.
-  - **Burn**: one quota in detail: pace cards, the cumulative burn against the even-pace line with a projection, the daily burn against the daily allowance, and a history of earlier periods.
+  - **Burn**: every quota in the profile at once, one subscription's quotas, or one quota. Several quotas show how many are over pace, each quota's share used over 24 hours to 90 days, what runs out before its reset, and a table of every quota with its pace and burn in the range (click a row for its detail). One quota shows pace cards, the cumulative burn against the even-pace line with a projection, the daily burn against the daily allowance, and a history of earlier periods.
+  - **Pace**: the same choice of quotas, as how far each one is over (+) or under (−) an even pace over time: the share used minus the share of the period gone, from −100% to +100%. Between readings the line falls as time passes, and it starts again from 0 at each reset. It also shows the quotas furthest over and under pace, the average now and over the range, and a table with a bar either side of even pace.
   - **Cost / Tokens**: Claude Code and Codex usage from their local session logs. It covers the past 24 hours, 7, 30 or 90 days, split by tool and model, plus cache savings and a breakdown by day. Cost is an API list-price estimate.
   - **Settings**: theme and brand, tray profile and quota, alert levels, which profile each subscription belongs to, polling interval.
 - **Profiles**: Work, Personal, or All. The dashboard and the tray each have their own (switch at the top of the dashboard, in the popup, or in the tray menu).
@@ -18,9 +19,11 @@ A Windows tray app that tracks AI coding subscriptions, shows whether you are bu
 |---|---|
 | <img src="docs/screenshots/limits.png" alt="Limits page" width="620"> | <img src="docs/screenshots/popup.png" alt="Tray summary popup" width="250"> |
 
-| Burn: one quota against an even pace | Cost: API-price estimate from local session logs |
+| Burn: all quotas, or one subscription's | Burn: one quota against an even pace |
 |---|---|
-| <img src="docs/screenshots/burn.png" alt="Burn page" width="440"> | <img src="docs/screenshots/cost.png" alt="Cost page" width="440"> |
+| <img src="docs/screenshots/burn.png" alt="Burn page, all quotas" width="440"> | <img src="docs/screenshots/burn-quota.png" alt="Burn page, one quota" width="440"> |
+| **Pace**: over (+) or under (−) an even pace, over time | **Cost**: API-price estimate from local session logs |
+| <img src="docs/screenshots/pace.png" alt="Pace page, all quotas" width="440"> | <img src="docs/screenshots/cost.png" alt="Cost page" width="440"> |
 | **Tokens** | **Settings** |
 | <img src="docs/screenshots/tokens.png" alt="Tokens page" width="440"> | <img src="docs/screenshots/settings.png" alt="Settings page" width="440"> |
 
@@ -84,7 +87,7 @@ Implement `IUsageProvider` in `src/AvaCodeStats.Core/Providers/<Name>/`. It retu
 
 ```powershell
 dotnet test
-dotnet run --project src/AvaCodeStats -- --open limits   # also: burn | cost | tokens
+dotnet run --project src/AvaCodeStats -- --open limits   # also: burn | pace | cost | tokens
 ./scripts/install.ps1                                    # publishes to %LOCALAPPDATA%\Programs\AvaCodeStats and starts it
 dotnet run --project src/AvaCodeStats -- --screenshots docs/screenshots   # regenerates the README screenshots
 ```

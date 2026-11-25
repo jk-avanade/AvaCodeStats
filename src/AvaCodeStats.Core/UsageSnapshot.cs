@@ -22,6 +22,19 @@ public sealed record UsageSnapshot(
     public double Remaining => Math.Max(0, Entitlement - Used);
 
     public double UsedFraction => Entitlement <= 0 ? 0 : Used / Entitlement;
+
+    /// <summary>
+    /// Providers report the reset time with jitter (Claude by fractions of a second, Codex by a second), so two
+    /// readings belong to the same period when their starts are this close.
+    /// </summary>
+    public static readonly TimeSpan PeriodJitter = TimeSpan.FromMinutes(2);
+
+    public bool SamePeriodAs(UsageSnapshot other) => SamePeriod(PeriodStartUtc, other.PeriodStartUtc);
+
+    public static bool SamePeriod(DateTimeOffset a, DateTimeOffset b) => (a - b).Duration() <= PeriodJitter;
+
+    /// <summary>True when this reading is in a later period than <paramref name="earlier"/> (a reset happened between them).</summary>
+    public bool IsLaterPeriodThan(UsageSnapshot earlier) => PeriodStartUtc - earlier.PeriodStartUtc > PeriodJitter;
 }
 
 /// <summary>Identifies one tracked quota: provider + account + metric.</summary>

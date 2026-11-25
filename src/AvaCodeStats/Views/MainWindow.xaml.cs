@@ -66,6 +66,7 @@ public partial class MainWindow : Window
         RadioButton nav = page switch
         {
             "burn" => NavBurn,
+            "pace" => NavPace,
             "cost" => NavCost,
             "tokens" => NavTokens,
             "settings" => NavSettings,
@@ -82,7 +83,7 @@ public partial class MainWindow : Window
 
     private void OnNav(object sender, RoutedEventArgs e)
     {
-        var page = sender == NavBurn ? "burn" : sender == NavCost ? "cost" : sender == NavTokens ? "tokens" : sender == NavSettings ? "settings" : "limits";
+        var page = sender == NavBurn ? "burn" : sender == NavPace ? "pace" : sender == NavCost ? "cost" : sender == NavTokens ? "tokens" : sender == NavSettings ? "settings" : "limits";
         Show(page);
     }
 
@@ -93,6 +94,7 @@ public partial class MainWindow : Window
             page = name switch
             {
                 "burn" => new BurnPage(_host),
+                "pace" => new BurnPage(_host, pace: true),
                 "cost" => new AnalyticsPage(_host, AnalyticsPage.CostMode),
                 "tokens" => new AnalyticsPage(_host, AnalyticsPage.TokensMode),
                 "settings" => new SettingsPage(_host),

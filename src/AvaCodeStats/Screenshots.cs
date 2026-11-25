@@ -23,7 +23,7 @@ internal static class Screenshots
 
     /// <summary>Page and the dashboard height (DIPs) that shows it without cutting a card in half.</summary>
     private static readonly (string Page, double Height)[] Pages =
-        [("limits", 1274), ("burn", 980), ("cost", 1180), ("tokens", 1180), ("settings", 1170)];
+        [("limits", 1274), ("burn", 1500), ("pace", 1500), ("cost", 1180), ("tokens", 1180), ("settings", 1170)];
 
     public static async Task RunAsync(AppHost host, string folder)
     {
@@ -52,6 +52,13 @@ internal static class Screenshots
                 main.Height = height;
                 main.Navigate(page);
                 await RenderAsync(main, Path.Combine(folder, $"{page}.png"));
+            }
+            // Burn opens on the overview; also show one quota in detail (the one most over pace).
+            if (host.Collector.PickTray(null, x => s.InActiveProfile(x.ProviderId, x.AccountId), s.Thresholds) is { } worst)
+            {
+                main.Height = 980;
+                main.ShowBurn(worst.Key);
+                await RenderAsync(main, Path.Combine(folder, "burn-quota.png"));
             }
             main.Close();
 

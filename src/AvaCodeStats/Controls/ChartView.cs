@@ -45,6 +45,8 @@ internal sealed class ChartModel
     public string[]? Categories { get; init; }
     public double? NowX { get; init; }
     public double? YMax { get; init; }
+    /// <summary>Bottom of the Y axis for values that go negative (line series only); null = 0.</summary>
+    public double? YMin { get; init; }
     /// <summary>Bar width in X units (e.g. 0.7 of a day).</summary>
     public double BarWidth { get; init; } = 0.7;
     public Func<double, string> FormatY { get; init; } = v => v.ToString("N0", CultureInfo.CurrentCulture);
@@ -61,6 +63,7 @@ internal sealed class ChartView : FrameworkElement
     private ChartModel? _model;
     private Point? _mouse;
     private Rect _plot;
+    private double _yMin;
 
     private const double LegendHeight = 30;
     private const double AxisFont = 12;
@@ -103,7 +106,7 @@ internal sealed class ChartView : FrameworkElement
 
     private double Px(double x, ChartModel m) => _plot.Left + (x - m.XMin) / Math.Max(1e-9, m.XMax - m.XMin) * _plot.Width;
 
-    private double Py(double y, double yMax) => _plot.Bottom - Math.Clamp(y / yMax, -0.05, 1.05) * _plot.Height;
+    private double Py(double y, double yMax) => _plot.Bottom - Math.Clamp((y - _yMin) / Math.Max(1e-9, yMax - _yMin), -0.05, 1.05) * _plot.Height;
 
     protected override void OnRender(DrawingContext dc)
     {
@@ -115,13 +118,18 @@ internal sealed class ChartView : FrameworkElement
         // Y scale
         var dataMax = m.Series.SelectMany(s => s.Y).DefaultIfEmpty(0).Max();
         var lineMax = m.Lines.Select(l => l.Y).DefaultIfEmpty(0).Max();
-        var (yMax, yStep) = NiceScale(m.YMax ?? Math.Max(dataMax, lineMax) * 1.08);
-        var yLabels = Enumerable.Range(0, (int)Math.Round(yMax / yStep) + 1).Select(i => i * yStep).ToList();
+        var (yMax, yStep) = NiceScale(m.YMax ?? Math.Max(dataMax, lineMax) * 1.08, m.YMin is null ? 5 : 4);
+        _yMin = m.YMin is { } lo ? Math.Floor(lo / yStep + 1e-9) * yStep : 0;
+        var yLabels = Enumerable.Range(0, (int)Math.Round((yMax - _yMin) / yStep) + 1).Select(i => _yMin + i * yStep).ToList();
         var labelWidth = yLabels.Max(v => Text(m.FormatY(v), AxisFont, p.TextSecondary).Width);
 
-        _plot = new Rect(labelWidth + 14, LegendHeight + 10, Math.Max(10, ActualWidth - labelWidth - 14 - 12), Math.Max(10, ActualHeight - LegendHeight - 10 - 30));
+        // The legend wraps onto more rows when the series don't fit on one.
+        var left = labelWidth + 14;
+        var legend = LayoutLegend(m, p, left, ActualWidth - 12);
+        var legendHeight = LegendHeight + (legend.Count == 0 ? 0 : legend.Max(l => l.row)) * LegendRow;
+        _plot = new Rect(left, legendHeight + 10, Math.Max(10, ActualWidth - left - 12), Math.Max(10, ActualHeight - legendHeight - 10 - 30));
 
-        DrawLegend(dc, m, p);
+        DrawLegend(dc, legend);
 
         // Gridlines and Y labels
         var grid = new Pen(ThemeService.Brush(p.Grid), 1);
@@ -152,7 +160,7 @@ internal sealed class ChartView : FrameworkElement
             dc.DrawText(t, new Point(Math.Min(x + 4, _plot.Right - t.Width), _plot.Top));
         }
 
-        if (m.EmptyText is { } empty && dataMax <= 0)
+        if (m.EmptyText is { } empty && (m.YMin is null ? dataMax <= 0 : !m.Series.Any(s => s.Y.Length > 0)))
         {
             var t = Text(empty, 13, p.TextSecondary);
             dc.DrawText(t, new Point(_plot.Left + (_plot.Width - t.Width) / 2, _plot.Top + (_plot.Height - t.Height) / 2));
@@ -161,22 +169,37 @@ internal sealed class ChartView : FrameworkElement
         DrawHover(dc, m, p, yMax);
     }
 
-    private void DrawLegend(DrawingContext dc, ChartModel m, Palette p)
+    private const double LegendRow = 22;
+
+    private List<(double x, int row, FormattedText text, Color color, bool box, bool dashed)> LayoutLegend(ChartModel m, Palette p, double left, double right)
     {
-        var x = _plot.Left;
         var items = m.Series.Where(s => s.InLegend).Select(s => (s.Name, s.Color, Box: s.Kind == SeriesKind.Bars, s.Dashed))
             .Concat(m.LegendExtras.Select(e => (e.Name, e.Color, e.Box, Dashed: false)));
+        var result = new List<(double, int, FormattedText, Color, bool, bool)>();
+        double x = left;
+        var row = 0;
         foreach (var (name, color, box, dashed) in items)
         {
-            var cy = 12.0;
+            var t = Text(name, 12.5, p.Text);
+            var width = 20 + t.Width;
+            if (x > left && x + width > right) { x = left; row++; }
+            result.Add((x, row, t, color, box, dashed));
+            x += width + 20;
+        }
+        return result;
+    }
+
+    private static void DrawLegend(DrawingContext dc, List<(double x, int row, FormattedText text, Color color, bool box, bool dashed)> legend)
+    {
+        foreach (var (x, row, t, color, box, dashed) in legend)
+        {
+            var cy = 12.0 + row * LegendRow;
             if (box)
                 dc.DrawRoundedRectangle(ThemeService.Brush(color), null, new Rect(x, cy - 5, 10, 10), 2, 2);
             else
                 dc.DrawLine(new Pen(ThemeService.Brush(color), 2.5) { DashStyle = dashed ? new DashStyle([1.5, 1.5], 0) : null, StartLineCap = PenLineCap.Round, EndLineCap = PenLineCap.Round },
                     new Point(x, cy), new Point(x + 14, cy));
-            var t = Text(name, 12.5, p.Text);
             dc.DrawText(t, new Point(x + 20, cy - t.Height / 2));
-            x += 20 + t.Width + 20;
         }
     }
 
@@ -319,7 +342,7 @@ internal sealed class ChartView : FrameworkElement
         var usedLabelYs = new List<double>();
         foreach (var l in m.Lines)
         {
-            if (l.Y < 0 || l.Y > yMax * 1.02) continue;
+            if (l.Y < _yMin || l.Y > yMax * 1.02) continue;
             var y = Math.Round(Py(l.Y, yMax)) + 0.5;
             dc.DrawLine(new Pen(ThemeService.Brush(l.Color), 1.5) { DashStyle = l.Dashed ? new DashStyle([4, 3], 0) : null },
                 new Point(_plot.Left, y), new Point(_plot.Right, y));

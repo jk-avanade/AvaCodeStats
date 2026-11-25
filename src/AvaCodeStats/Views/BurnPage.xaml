@@ -5,16 +5,194 @@
 >
     <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
         <StackPanel Margin="36,4,36,32" MaxWidth="1120">
+            <!-- Scope: every quota in the profile, one subscription, or one quota. -->
             <Grid Margin="0,0,0,16">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
-                <ComboBox x:Name="Picker" MinWidth="380" SelectionChanged="OnPick" />
+                <ComboBox x:Name="Picker" MinWidth="380" SelectionChanged="OnPick">
+                    <ComboBox.ItemTemplate>
+                        <DataTemplate>
+                            <TextBlock Text="{Binding Label}" FontWeight="{Binding Weight}">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="Margin" Value="{Binding Indent}" />
+                                        <Style.Triggers>
+                                            <!-- No indent in the closed box. -->
+                                            <DataTrigger Binding="{Binding RelativeSource={RelativeSource AncestorType=ComboBoxItem}}" Value="{x:Null}">
+                                                <Setter Property="Margin" Value="0" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+                        </DataTemplate>
+                    </ComboBox.ItemTemplate>
+                </ComboBox>
                 <TextBlock x:Name="Plan" Grid.Column="1" Style="{StaticResource Caption}" HorizontalAlignment="Right" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" Margin="16,0,0,0" />
+                <Border x:Name="RangeHost" Grid.Column="2" Style="{StaticResource SegmentedHost}" Margin="16,0,0,0">
+                    <StackPanel Orientation="Horizontal">
+                        <RadioButton Style="{StaticResource Segment}" GroupName="BurnRange" Content="24 hours" Tag="24h" Checked="OnRange" />
+                        <RadioButton Style="{StaticResource Segment}" GroupName="BurnRange" Content="7 days" Tag="7d" Checked="OnRange" />
+                        <RadioButton x:Name="Range30" Style="{StaticResource Segment}" GroupName="BurnRange" Content="30 days" Tag="30d" Checked="OnRange" />
+                        <RadioButton Style="{StaticResource Segment}" GroupName="BurnRange" Content="90 days" Tag="90d" Checked="OnRange" />
+                    </StackPanel>
+                </Border>
             </Grid>
 
             <TextBlock x:Name="Empty" Style="{StaticResource Body}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Visibility="Collapsed" />
+
+            <!-- Several quotas at once (all, or one subscription), in shares of each quota. -->
+            <StackPanel x:Name="Overview" Visibility="Collapsed">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="320" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Margin="0,0,24,0">
+                        <TextBlock x:Name="OvHero" Style="{StaticResource HeroNumber}" FontSize="44" />
+                        <TextBlock x:Name="OvSub" Style="{StaticResource Caption}" FontSize="13" Margin="0,2,0,0" />
+                        <ItemsControl x:Name="OvGroups" Margin="0,20,0,0" Focusable="False">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Grid Margin="0,0,0,16">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="18" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition />
+                                            <RowDefinition />
+                                        </Grid.RowDefinitions>
+                                        <Ellipse Width="9" Height="9" Fill="{Binding Dot}" VerticalAlignment="Center" HorizontalAlignment="Left" />
+                                        <!-- The name shortens before the count does. -->
+                                        <Grid Grid.Column="1">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto" />
+                                                <ColumnDefinition Width="*" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Text="{Binding Name}" ToolTip="{Binding Name}" Style="{StaticResource BodyStrong}" MaxWidth="158" TextTrimming="CharacterEllipsis" />
+                                            <TextBlock Grid.Column="1" Text="{Binding Count}" Style="{StaticResource Caption}" Margin="8,0,0,0" VerticalAlignment="Bottom" MinWidth="50" />
+                                        </Grid>
+                                        <TextBlock Grid.Column="2" Text="{Binding Value}" Style="{StaticResource BodyStrong}" Margin="8,0,0,0" />
+                                        <TextBlock Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="2" Text="{Binding Detail}" Foreground="{Binding DetailBrush}"
+                                                   Style="{StaticResource Caption}" Margin="0,2,0,0" TextTrimming="CharacterEllipsis" />
+                                    </Grid>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                    <Border Grid.Column="1" Style="{StaticResource Card}" Padding="18,14,18,10">
+                        <StackPanel>
+                            <TextBlock x:Name="OvChartTitle" Text="Used over time" Style="{StaticResource BodyStrong}" Margin="4,0,0,4" />
+                            <c:ChartView x:Name="OvChart" Height="320" Margin="0,6,0,0" />
+                        </StackPanel>
+                    </Border>
+                </Grid>
+
+                <Border Style="{StaticResource Card}" Margin="0,20,0,0">
+                    <StackPanel>
+                        <TextBlock Text="At a glance" Style="{StaticResource BodyStrong}" Margin="0,0,0,12" />
+                        <ItemsControl x:Name="OvKpis" Focusable="False">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <UniformGrid Columns="5" />
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <StackPanel Margin="0,0,12,0">
+                                        <TextBlock Text="{Binding Label}" Style="{StaticResource Caption}" />
+                                        <TextBlock Text="{Binding Value}" Style="{StaticResource KpiValue}" Foreground="{Binding Brush}" Margin="0,2,0,0" />
+                                        <TextBlock Text="{Binding Note}" ToolTip="{Binding Note}" Style="{StaticResource Caption}" TextTrimming="CharacterEllipsis" />
+                                    </StackPanel>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </Border>
+
+                <Border Style="{StaticResource Card}" Margin="0,16,0,0" Padding="20,16,20,8">
+                    <StackPanel>
+                        <TextBlock Text="Quotas" Style="{StaticResource BodyStrong}" Margin="0,0,0,8" />
+                        <Grid Margin="0,4,0,4">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="36" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="70" />
+                                <ColumnDefinition Width="190" />
+                                <ColumnDefinition Width="110" />
+                                <ColumnDefinition Width="100" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="#" Style="{StaticResource Caption}" />
+                            <TextBlock Grid.Column="1" Text="Quota" Style="{StaticResource Caption}" />
+                            <TextBlock x:Name="LeftHeader" Grid.Column="2" Text="Left" Style="{StaticResource Caption}" HorizontalAlignment="Right" />
+                            <TextBlock Grid.Column="3" Text="Pace" Style="{StaticResource Caption}" Margin="24,0,0,0" />
+                            <TextBlock x:Name="BurnedHeader" Grid.Column="4" Style="{StaticResource Caption}" HorizontalAlignment="Right" />
+                            <TextBlock Grid.Column="5" Text="Resets in" Style="{StaticResource Caption}" HorizontalAlignment="Right" />
+                        </Grid>
+                        <ItemsControl x:Name="OvRows" Focusable="False">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Border BorderBrush="{DynamicResource DividerStrokeColorDefaultBrush}" BorderThickness="0,1,0,0">
+                                        <Border Style="{StaticResource ClickableRow}" Margin="-8,2" Padding="8,8" MouseLeftButtonUp="OnRowClick" ToolTip="{Binding Tip}">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="36" />
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="70" />
+                                                    <ColumnDefinition Width="190" />
+                                                    <ColumnDefinition Width="110" />
+                                                    <ColumnDefinition Width="100" />
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock Text="{Binding Rank}" Style="{StaticResource Caption}" VerticalAlignment="Center" />
+                                                <StackPanel Grid.Column="1" Margin="0,0,24,0">
+                                                    <StackPanel Orientation="Horizontal">
+                                                        <Ellipse Width="8" Height="8" Fill="{Binding Dot}" VerticalAlignment="Center" Margin="0,0,8,0" />
+                                                        <TextBlock Text="{Binding Name}" Style="{StaticResource Body}" />
+                                                        <TextBlock Text="{Binding Sub}" Style="{StaticResource Caption}" Margin="8,0,0,0" VerticalAlignment="Bottom" TextTrimming="CharacterEllipsis" />
+                                                    </StackPanel>
+                                                    <!-- Share of the quota used -->
+                                                    <Grid Margin="0,6,0,0" Height="3" Visibility="{Binding UsedBar}">
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="{Binding UsedLength}" />
+                                                            <ColumnDefinition Width="{Binding RestLength}" />
+                                                        </Grid.ColumnDefinitions>
+                                                        <Border Background="{Binding Bar}" CornerRadius="1.5" MinWidth="3" />
+                                                    </Grid>
+                                                    <!-- Under pace grows left of the centre line, over pace right of it (each side's columns add up to 1) -->
+                                                    <Grid Margin="0,5,0,0" Height="5" Visibility="{Binding PaceBar}">
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="{Binding UnderRest}" />
+                                                            <ColumnDefinition Width="{Binding Under}" />
+                                                            <ColumnDefinition Width="{Binding Over}" />
+                                                            <ColumnDefinition Width="{Binding OverRest}" />
+                                                        </Grid.ColumnDefinitions>
+                                                        <Border Grid.ColumnSpan="4" Height="1" Background="{DynamicResource DividerStrokeColorDefaultBrush}" />
+                                                        <Border Grid.Column="1" Background="{Binding Bar}" Height="3" CornerRadius="1.5,0,0,1.5" />
+                                                        <Border Grid.Column="2" Background="{Binding Bar}" Height="3" CornerRadius="0,1.5,1.5,0" />
+                                                        <Border Grid.ColumnSpan="4" Width="1.5" HorizontalAlignment="Center" Background="{DynamicResource TextFillColorSecondaryBrush}" />
+                                                    </Grid>
+                                                </StackPanel>
+                                                <TextBlock Grid.Column="2" Text="{Binding Left}" Style="{StaticResource Body}" HorizontalAlignment="Right" VerticalAlignment="Center" />
+                                                <StackPanel Grid.Column="3" Orientation="Horizontal" Margin="24,0,0,0" VerticalAlignment="Center">
+                                                    <TextBlock Text="{Binding PaceGlyph}" Style="{StaticResource Glyph}" FontSize="11" Foreground="{Binding PaceBrush}" />
+                                                    <TextBlock Text="{Binding Pace}" Style="{StaticResource Body}" Foreground="{Binding PaceBrush}" Margin="6,0,0,0" />
+                                                </StackPanel>
+                                                <TextBlock Grid.Column="4" Text="{Binding Burned}" Style="{StaticResource Body}" HorizontalAlignment="Right" VerticalAlignment="Center" />
+                                                <TextBlock Grid.Column="5" Text="{Binding Resets}" ToolTip="{Binding ResetTip}" Style="{StaticResource Body}" HorizontalAlignment="Right" VerticalAlignment="Center" />
+                                            </Grid>
+                                        </Border>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </Border>
+            </StackPanel>
 
             <StackPanel x:Name="Body">
                 <Border Style="{StaticResource Card}" Padding="24">

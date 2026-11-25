@@ -90,7 +90,8 @@ internal sealed class LimitGroup
     public string ToggleTip => IsCollapsed ? $"Show all {Items.Count} limits" : "Show only the most pressing limit";
     public string HiddenText => IsCollapsed ? $"+{Items.Count - 1} more" : "";
 
-    private static LimitItem Worst(IEnumerable<LimitItem> items) => items
+    /// <summary>The most pressing quota: worst pace, then least left, then soonest reset.</summary>
+    internal static LimitItem Worst(IEnumerable<LimitItem> items) => items
         .OrderByDescending(i => AlertRules.Severity(i.Status))
         .ThenBy(i => i.LeftFraction)
         .ThenBy(i => i.Snapshot.PeriodEndUtc)

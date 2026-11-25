@@ -60,7 +60,7 @@ public sealed class UsageStore
             && last.Entitlement.Equals(s.Entitlement)
             // An unused rolling window (Antigravity) reports "reset = now + window" on every read;
             // consecutive 0% readings are the same reading even though the period moved.
-            && (last.PeriodStartUtc == s.PeriodStartUtc || (last.Used == 0 && s.Used == 0))
+            && (last.SamePeriodAs(s) || (last.Used == 0 && s.Used == 0))
             && s.TimestampUtc - last.TimestampUtc < HeartbeatInterval)
         {
             return false;
@@ -120,7 +120,7 @@ public sealed class UsageStore
         return Read(cmd).ToList();
     }
 
-    /// <summary>One row per billing period: the highest usage seen in it.</summary>
+    /// <summary>One row per billing period: the highest usage seen in it. Starts within <see cref="UsageSnapshot.PeriodJitter"/> are one period.</summary>
     public IReadOnlyList<PeriodSummary> GetPeriodSummaries(SubscriptionKey key)
     {
         using var c = Open();
@@ -137,10 +137,26 @@ public sealed class UsageStore
         using var r = cmd.ExecuteReader();
         while (r.Read())
         {
-            list.Add(new PeriodSummary(ParseIso(r.GetString(0)), ParseIso(r.GetString(1)),
-                r.GetDouble(2), r.GetDouble(3), r.GetInt32(4)));
+            var row = new PeriodSummary(ParseIso(r.GetString(0)), ParseIso(r.GetString(1)), r.GetDouble(2), r.GetDouble(3), r.GetInt32(4));
+            if (list.Count > 0 && UsageSnapshot.SamePeriod(list[^1].PeriodStartUtc, row.PeriodStartUtc))
+            {
+                var last = list[^1];
+                list[^1] = last with
+                {
+                    PeriodEndUtc = Max(last.PeriodEndUtc, row.PeriodEndUtc),
+                    Used = Math.Max(last.Used, row.Used),
+                    Entitlement = Math.Max(last.Entitlement, row.Entitlement),
+                    SampleCount = last.SampleCount + row.SampleCount,
+                };
+            }
+            else
+            {
+                list.Add(row);
+            }
         }
         return list;
+
+        static DateTimeOffset Max(DateTimeOffset a, DateTimeOffset b) => a > b ? a : b;
     }
 
     private const string SelectColumns = """

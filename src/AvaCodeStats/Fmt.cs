@@ -10,6 +10,13 @@ internal static class Fmt
         _ => $"{v:0}",
     };
 
+    /// <summary>A share with its sign, e.g. "+16%" or "−79%".</summary>
+    public static string Signed(double fraction)
+    {
+        var v = Math.Round(fraction * 100);
+        return v > 0 ? $"+{v:0}%" : v < 0 ? $"\u2212{-v:0}%" : "0%";
+    }
+
     public static string Money(double v) => v >= 1000 ? $"${v:N0}" : $"${v:N2}";
 
     public static string Countdown(TimeSpan t)

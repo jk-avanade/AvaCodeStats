@@ -3,7 +3,7 @@ using System.Windows;
 namespace AvaCodeStats;
 
 /// <summary>
-/// Tray app. Options: --open [limits|burn|cost|tokens|settings] opens the dashboard on start;
+/// Tray app. Options: --open [limits|burn|pace|cost|tokens|settings] opens the dashboard on start;
 /// --summary opens the tray summary popup; --screenshots &lt;folder&gt; saves README screenshots and exits.
 /// </summary>
 public partial class App : Application

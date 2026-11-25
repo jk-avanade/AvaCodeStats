@@ -20,6 +20,7 @@
             <StackPanel>
                 <RadioButton x:Name="NavLimits" Style="{StaticResource NavItem}" GroupName="Nav" Tag="&#xEC4A;" Content="Limits" Checked="OnNav" />
                 <RadioButton x:Name="NavBurn" Style="{StaticResource NavItem}" GroupName="Nav" Tag="&#xE9D2;" Content="Burn" Checked="OnNav" />
+                <RadioButton x:Name="NavPace" Style="{StaticResource NavItem}" GroupName="Nav" Tag="&#xE916;" Content="Pace" Checked="OnNav" />
                 <RadioButton x:Name="NavCost" Style="{StaticResource NavItem}" GroupName="Nav" Tag="&#xE8C7;" Content="Cost" Checked="OnNav" />
                 <RadioButton x:Name="NavTokens" Style="{StaticResource NavItem}" GroupName="Nav" Tag="&#xE943;" Content="Tokens" Checked="OnNav" />
             </StackPanel>
