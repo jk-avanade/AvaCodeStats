@@ -95,14 +95,15 @@ internal static class Screenshots
         host.Collector.UseHistoryAsLastCollection();
     }
 
-    private sealed record Shot(string File, double Seconds, bool Fade, string? Caption);
+    /// <summary>A rendered shot and where its key parts are, in pixels of the image.</summary>
+    private sealed record Shot(string File, Dictionary<string, double[]> Rects);
 
-    private const double TourScale = 1.25;
+    private const double TourScale = 3;
 
     /// <summary>
-    /// --tour &lt;folder&gt;: frames of a short walk through the dashboard at a normal window size, with a
-    /// manifest (tour.json) of how long to hold each one, where to cross-fade and what caption to show.
-    /// scripts/make-video.py turns them into an MP4 and a GIF.
+    /// --tour &lt;folder&gt;: the shots of the showcase video, rendered at 3x so the video can zoom in, with a
+    /// manifest (tour.json) of where each shot's key parts are (charts, the profile switch, the ring) so it
+    /// can zoom to and highlight them. scripts/make-video.py cuts them into docs/tour.mp4 and docs/tour.gif.
     /// </summary>
     public static async Task TourAsync(AppHost host, string folder)
     {
@@ -112,26 +113,29 @@ internal static class Screenshots
             foreach (var old in Directory.GetFiles(folder, "*.png")) File.Delete(old);
             Prepare(host);
             var s = host.Settings;
-            var shots = new List<Shot>();
-            var n = 0;
-            async Task Frame(Window w, double seconds, bool fade, string? caption, int settle = 800)
+            var shots = new Dictionary<string, Shot>();
+            // A normal window, not the saved (maybe maximized) one.
+            s.WindowMaximized = false;
+            s.WindowWidth = 1280;
+            s.WindowHeight = 800;
+
+            async Task Take(Window w, string name, params (string Name, FrameworkElement? Element)[] parts)
             {
-                var file = $"{++n:0000}.png";
-                await RenderAsync(w, Path.Combine(folder, file), settle, TourScale);
-                shots.Add(new Shot(file, seconds, fade, caption));
-            }
-            // Eases the page down to the end and holds there.
-            async Task Scroll(Window w, string? caption, double hold)
-            {
-                if (Find<ScrollViewer>((DependencyObject)w.Content) is not { ScrollableHeight: > 0 } sv) return;
-                const int steps = 28;
-                for (var i = 1; i <= steps; i++)
+                await RenderAsync(w, Path.Combine(folder, $"{name}.png"), 800, TourScale);
+                var root = (Visual)w.Content;
+                var rects = new Dictionary<string, double[]>();
+                foreach (var (part, e) in parts)
                 {
-                    var t = (double)i / steps;
-                    sv.ScrollToVerticalOffset(sv.ScrollableHeight * (t < 0.5 ? 2 * t * t : 1 - Math.Pow(-2 * t + 2, 2) / 2));
-                    sv.UpdateLayout();
-                    await Frame(w, i == steps ? hold : 1.0 / 30, false, caption, settle: 0);
+                    if (e is not { IsVisible: true }) continue;
+                    var r = e.TransformToAncestor(root).TransformBounds(new Rect(0, 0, e.ActualWidth, e.ActualHeight));
+                    rects[part] = [r.X * TourScale, r.Y * TourScale, r.Width * TourScale, r.Height * TourScale];
                 }
+                shots[name] = new Shot($"{name}.png", rects);
+            }
+            void Profile(string profile)
+            {
+                s.ActiveProfile = profile;
+                host.SaveSettings();
             }
 
             host.ShowDashboard("limits");
@@ -141,48 +145,51 @@ internal static class Screenshots
             main.Top = OffScreen;
             main.Width = 1280;
             main.Height = 800;
-            const string limits = "Limits: every quota, grouped by subscription";
-            await Frame(main, 3.0, true, limits);
-            await Scroll(main, limits, 1.5);
-
-            main.Navigate("burn");
-            var burn = (BurnPage)main.CurrentPage!;
-            burn.ShowScope("all");
-            burn.SetRange("30d");
-            const string all = "Burn: every quota at once";
-            await Frame(main, 3.5, true, all);
-            await Scroll(main, all, 2.0);
-
-            s.ActiveProfile = Profiles.Work;
-            host.SaveSettings();
-            burn.ShowScope("all");
-            await Frame(main, 3.0, true, "Or only the Work subscriptions");
-
-            s.ActiveProfile = Profiles.Unified;
-            host.SaveSettings();
-            if (host.Collector.PickTray(null, x => s.InActiveProfile(x.ProviderId, x.AccountId), s.Thresholds) is { } worst)
-            {
-                main.ShowBurn(worst.Key);
-                await Frame(main, 3.5, true, "One quota against an even pace");
-            }
+            (string, FrameworkElement?)[] chrome =
+                [("switch", main.ProfileSwitch), ("work", main.ProfileWork), ("personal", main.ProfilePersonal), ("all", main.ProfileUnified)];
+            await Take(main, "limits", chrome);
 
             main.Navigate("pace");
             var pace = (BurnPage)main.CurrentPage!;
-            pace.ShowScope("all");
             pace.SetRange("30d");
-            await Frame(main, 4.0, true, "Pace: over (+) or under (\u2212) an even pace");
-            pace.SetRange("24h");
-            const string range = "Any range from 24 hours to 90 days";
-            await Frame(main, 2.5, true, range);
-            await Scroll(main, range, 2.0);
+            (string, FrameworkElement?)[] Overview(BurnPage page) =>
+                [.. chrome, ("chart", page.OvChart), ("groups", page.OvGroups), ("hero", page.OvHero), ("kpis", page.OvKpis),
+                 ("rows", page.OvRows), ("picker", page.Picker), ("range", page.RangeHost)];
+            foreach (var (profile, name) in new[] { (Profiles.Work, "pace-work"), (Profiles.Personal, "pace-personal"), (Profiles.Unified, "pace-all") })
+            {
+                Profile(profile);
+                pace.ShowScope("all");
+                await Take(main, name, Overview(pace));
+            }
+            if (Find<ScrollViewer>(pace) is { } sv)
+            {
+                sv.ScrollToVerticalOffset(pace.OvRows.TransformToAncestor(sv).Transform(new Point()).Y - 60);
+                sv.UpdateLayout();
+                await Take(main, "pace-table", Overview(pace));
+                sv.ScrollToTop();
+            }
+
+            main.Navigate("burn");
+            var burn = (BurnPage)main.CurrentPage!;
+            burn.SetRange("30d");
+            foreach (var (profile, name) in new[] { (Profiles.Work, "burn-work"), (Profiles.Personal, "burn-personal"), (Profiles.Unified, "burn-all") })
+            {
+                Profile(profile);
+                burn.ShowScope("all");
+                await Take(main, name, Overview(burn));
+            }
+            if (host.Collector.PickTray(null, x => s.InActiveProfile(x.ProviderId, x.AccountId), s.Thresholds) is { } worst)
+            {
+                main.ShowBurn(worst.Key);
+                await Take(main, "quota", [.. chrome, ("ring", burn.Ring), ("kpis", burn.Kpis), ("chart", burn.Chart)]);
+            }
 
             main.Navigate("cost");
-            await Frame(main, 3.0, true, "Cost: an API-price estimate from local session logs");
+            await Take(main, "cost", chrome);
             main.Navigate("tokens");
-            await Frame(main, 3.0, true, "Tokens per model, tool and day");
+            await Take(main, "tokens", chrome);
             main.Close();
 
-            // The tray popup, laid over the last frame by make-video.py.
             host.ShowSummary();
             var popup = host.Summary!;
             AllowTallerThanScreen(popup);
@@ -193,8 +200,7 @@ internal static class Screenshots
             popup.Height = content.DesiredSize.Height;
             popup.Left = OffScreen;
             popup.Top = OffScreen;
-            await RenderAsync(popup, Path.Combine(folder, "popup.png"), 800, TourScale);
-            shots.Add(new Shot("popup.png", 4.0, true, "The tray popup: every subscription at a glance"));
+            await Take(popup, "popup");
 
             File.WriteAllText(Path.Combine(folder, "tour.json"), JsonSerializer.Serialize(shots));
         }

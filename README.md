@@ -2,9 +2,9 @@
 
 A Windows tray app that tracks AI coding subscriptions, shows whether you are burning them faster than an even pace, and keeps a history of usage, tokens and cost.
 
-<a href="docs/tour.mp4"><img src="docs/tour.gif" alt="A short tour: Limits, Burn across all quotas and for Work only, one quota in detail, Pace, Cost, Tokens and the tray popup" width="760"></a>
+<a href="docs/tour.mp4"><img src="docs/tour.gif" alt="Showcase: the pace graph, every quota over or under pace, Work / Personal / All, Burn, one quota in detail, Limits, Cost, Tokens and the tray popup" width="760"></a>
 
-*A 38-second tour ([MP4](docs/tour.mp4)).*
+*33-second showcase ([full-quality MP4](docs/tour.mp4)).*
 
 - **Tray ring**: the arc is how much of the quota is used. The notch is where an even pace would be today. The arc past the notch is overburn (amber or red); a faint stretch before it is budget in hand. It follows the **tray profile** (Work by default) and shows the quota furthest over pace, unless you pick one.
 - **Click** the ring for the summary popup: the tray profile's quotas at a glance, with a profile switch. **Double-click** for the dashboard, **right-click** for the menu.
@@ -94,7 +94,7 @@ dotnet test
 dotnet run --project src/AvaCodeStats -- --open limits   # also: burn | pace | cost | tokens
 ./scripts/install.ps1                                    # publishes to %LOCALAPPDATA%\Programs\AvaCodeStats and starts it
 dotnet run --project src/AvaCodeStats -- --screenshots docs/screenshots   # regenerates the README screenshots
-dotnet run --project src/AvaCodeStats -- --tour artifacts/tour            # renders the frames of the tour video
+dotnet run --project src/AvaCodeStats -- --tour artifacts/tour            # renders the shots of the showcase video
 uv run scripts/make-video.py artifacts/tour                               # builds docs/tour.mp4 and docs/tour.gif
 ```
 
