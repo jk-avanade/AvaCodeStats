@@ -100,6 +100,9 @@ public sealed class AppSettings
     /// <summary>Start with Windows (installed copy only). On by default; turning it off in Settings sticks.</summary>
     public bool StartWithWindows { get; set; } = true;
 
+    /// <summary>Hide short (sub-weekly, e.g. 5-hour/daily) quotas on Burn and Pace to reduce chart noise.</summary>
+    public bool HideShortWindows { get; set; }
+
     [JsonIgnore]
     public PaceThresholds Thresholds => new(OnPaceDays, FarOverDays);
 

@@ -39,8 +39,24 @@ public partial class BurnPage : UserControl, IPage
 
     internal void Select(SubscriptionKey key)
     {
+        if (_host.Settings.HideShortWindows
+            && _host.Collector.Latest.TryGetValue(key, out var snap)
+            && !IsLongWindow(snap))
+        {
+            _host.Settings.HideShortWindows = false;
+            _host.SaveSettings();
+        }
         _scope = QuotaScope(key);
         Refresh();
+    }
+
+    private static bool IsLongWindow(UsageSnapshot s) => s.PeriodEndUtc - s.PeriodStartUtc >= TimeSpan.FromDays(6);
+
+    private IReadOnlyList<LimitItem> FilteredItems(out int totalCount)
+    {
+        var all = LimitItem.For(_host, _host.Settings.ActiveProfile);
+        totalCount = all.Count;
+        return _host.Settings.HideShortWindows ? all.Where(i => IsLongWindow(i.Snapshot)).ToList() : all;
     }
 
     /// <summary>Shows a scope by id: "all", "sub:provider:account" or "quota:provider:account:metric".</summary>
@@ -74,7 +90,7 @@ public partial class BurnPage : UserControl, IPage
     public void Refresh()
     {
         var s = _host.Settings;
-        var items = LimitItem.For(_host, s.ActiveProfile);
+        var items = FilteredItems(out var totalCount);
         var groups = LimitGroup.From(items, s, false, Array.Empty<string>());
 
         // All quotas, then each subscription with its quotas under it (a single-quota subscription is just the quota).
@@ -94,6 +110,7 @@ public partial class BurnPage : UserControl, IPage
         }
 
         _filling = true;
+        (s.HideShortWindows ? WindowWeekly : WindowAll).IsChecked = true;
         Picker.ItemsSource = scopes;
         var index = scopes.FindIndex(x => x.Id == _scope);
         Picker.SelectedIndex = scopes.Count == 0 ? -1 : Math.Max(0, index);
@@ -104,8 +121,11 @@ public partial class BurnPage : UserControl, IPage
         {
             _version++;
             Body.Visibility = Overview.Visibility = RangeHost.Visibility = Visibility.Collapsed;
+            WindowFilterHost.Visibility = totalCount > 0 ? Visibility.Visible : Visibility.Collapsed;
             Empty.Visibility = Visibility.Visible;
-            Empty.Text = $"No quotas in the {Profiles.Label(s.ActiveProfile)} profile yet.";
+            Empty.Text = totalCount > 0 && s.HideShortWindows
+                ? $"No weekly or monthly quotas in the {Profiles.Label(s.ActiveProfile)} profile. Switch to All to see shorter windows."
+                : $"No quotas in the {Profiles.Label(s.ActiveProfile)} profile yet.";
             Plan.Text = "";
         }
     }
@@ -118,7 +138,7 @@ public partial class BurnPage : UserControl, IPage
         {
             _version++; // drop an overview still loading
             _quota = one.Snapshot;
-            Overview.Visibility = RangeHost.Visibility = Visibility.Collapsed;
+            Overview.Visibility = RangeHost.Visibility = WindowFilterHost.Visibility = Visibility.Collapsed;
             Plan.Visibility = Visibility.Visible;
             Draw(one.Snapshot);
             return;
@@ -128,14 +148,23 @@ public partial class BurnPage : UserControl, IPage
         var selected = items.Where(i => scope == AllScope || $"sub:{i.Snapshot.ProviderId}:{i.Snapshot.AccountId}" == scope || QuotaScope(i.Key) == scope).ToList();
         if (selected.Count == 0) selected = items.ToList();
         Body.Visibility = Plan.Visibility = Visibility.Collapsed;
-        Overview.Visibility = RangeHost.Visibility = Visibility.Visible;
+        Overview.Visibility = RangeHost.Visibility = WindowFilterHost.Visibility = Visibility.Visible;
         DrawOverview(selected, single: scope != AllScope);
     }
 
     private void OnPick(object sender, SelectionChangedEventArgs e)
     {
         if (_filling || Picker.SelectedItem is not Scope scope) return;
-        Show(scope.Id, LimitItem.For(_host, _host.Settings.ActiveProfile));
+        Show(scope.Id, FilteredItems(out _));
+    }
+
+    private void OnWindowFilter(object sender, RoutedEventArgs e)
+    {
+        if (_filling || sender is not RadioButton { Tag: string tag }) return;
+        var hideShort = tag == "weekly";
+        if (_host.Settings.HideShortWindows == hideShort) return;
+        _host.Settings.HideShortWindows = hideShort;
+        _host.SaveSettings();
     }
 
     private void OnRange(object sender, RoutedEventArgs e)

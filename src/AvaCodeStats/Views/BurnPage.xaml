@@ -11,8 +11,9 @@
                     <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
-                <ComboBox x:Name="Picker" MinWidth="380" SelectionChanged="OnPick">
+                <ComboBox x:Name="Picker" MinWidth="260" SelectionChanged="OnPick">
                     <ComboBox.ItemTemplate>
                         <DataTemplate>
                             <TextBlock Text="{Binding Label}" FontWeight="{Binding Weight}">
@@ -32,7 +33,14 @@
                     </ComboBox.ItemTemplate>
                 </ComboBox>
                 <TextBlock x:Name="Plan" Grid.Column="1" Style="{StaticResource Caption}" HorizontalAlignment="Right" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" Margin="16,0,0,0" />
-                <Border x:Name="RangeHost" Grid.Column="2" Style="{StaticResource SegmentedHost}" Margin="16,0,0,0">
+                <Border x:Name="WindowFilterHost" Grid.Column="2" Style="{StaticResource SegmentedHost}" Margin="16,0,0,0"
+                        ToolTip="Filter out 5-hour and daily windows to focus on weekly and monthly trends">
+                    <StackPanel Orientation="Horizontal">
+                        <RadioButton x:Name="WindowAll" Style="{StaticResource Segment}" GroupName="BurnWindow" Content="All" Tag="all" Checked="OnWindowFilter" />
+                        <RadioButton x:Name="WindowWeekly" Style="{StaticResource Segment}" GroupName="BurnWindow" Content="Weekly+" Tag="weekly" Checked="OnWindowFilter" />
+                    </StackPanel>
+                </Border>
+                <Border x:Name="RangeHost" Grid.Column="3" Style="{StaticResource SegmentedHost}" Margin="12,0,0,0">
                     <StackPanel Orientation="Horizontal">
                         <RadioButton Style="{StaticResource Segment}" GroupName="BurnRange" Content="24 hours" Tag="24h" Checked="OnRange" />
                         <RadioButton Style="{StaticResource Segment}" GroupName="BurnRange" Content="7 days" Tag="7d" Checked="OnRange" />
